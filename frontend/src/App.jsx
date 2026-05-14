@@ -47,7 +47,7 @@ const styles = `
     border-bottom: 1px solid var(--cream-border);
     padding: 28px 40px;
     display: flex;
-    align-items: center;
+    align-items: left;
     gap: 16px;
     box-shadow: 0 2px 12px rgba(107,76,42,0.06);
   }
@@ -702,7 +702,7 @@ export default function App() {
       <style>{styles}</style>
       <div className="app">
         <header className="header">
-          <div className="header-icon">🏥</div>
+          <div className="header-icon">📒</div>
           <div>
             <div className="header-title">Buku Tarif</div>
             <div className="header-sub">Pencarian tarif layanan & tindakan medis rumah sakit</div>
