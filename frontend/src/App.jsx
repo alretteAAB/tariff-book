@@ -704,8 +704,9 @@ export default function App() {
         <header className="header">
           <div className="header-icon">🏥</div>
           <div>
-            <div className="header-title">Tarif Rumah Sakit</div>
-            <div className="header-sub">Pencarian tarif layanan & tindakan medis</div>
+            <div className="header-title">Buku Tarif</div>
+            <div className="header-sub">Pencarian tarif layanan & tindakan medis rumah sakit</div>
+            <div className="header-sub">by : ASO</div>
           </div>
         </header>
 
