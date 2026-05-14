@@ -46,7 +46,7 @@ const styles = `
     background: var(--white);
     border-bottom: 1px solid var(--cream-border);
     padding: 28px 40px;
-    display: flex;
+    /* display: flex; */
     align-items: left;
     gap: 16px;
     box-shadow: 0 2px 12px rgba(107,76,42,0.06);
@@ -64,10 +64,12 @@ const styles = `
     font-family: 'Playfair Display', serif;
     font-size: 22px; font-weight: 700;
     color: var(--brown); letter-spacing: -0.3px;
+    text-align : left;
   }
   .header-sub {
     font-size: 13px; color: var(--text-muted);
     margin-top: 2px; font-weight: 400;
+    text-align = left;
   }
 
   /* MAIN */
