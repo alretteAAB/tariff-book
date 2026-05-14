@@ -46,7 +46,7 @@ const styles = `
     background: var(--white);
     border-bottom: 1px solid var(--cream-border);
     padding: 28px 40px;
-    /* display: flex; */
+    display: flex;
     align-items: left;
     gap: 16px;
     box-shadow: 0 2px 12px rgba(107,76,42,0.06);
