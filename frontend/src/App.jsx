@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 const API = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -61,7 +61,6 @@ const styles = `
     flex-shrink: 0;
   }
   .header-title {
-    font-family: 'Playfair Display', serif;
     font-size: 22px; font-weight: 700;
     color: var(--brown); letter-spacing: -0.3px;
     text-align : left;
@@ -430,7 +429,6 @@ const styles = `
   }
   .td-tarif {
     text-align: right;
-    font-family: 'Playfair Display', serif;
     font-size: 15px; font-weight: 600;
     color: var(--gold-dark); white-space: nowrap;
   }
@@ -444,7 +442,6 @@ const styles = `
   }
   .state-icon { font-size: 44px; margin-bottom: 16px; }
   .state-title {
-    font-family: 'Playfair Display', serif;
     font-size: 20px; font-weight: 600;
     color: var(--brown); margin-bottom: 8px;
   }
@@ -820,11 +817,11 @@ export default function App() {
                 <table>
                   <thead>
                     <tr>
+                      <th>Tahun</th>
+                      {showRS && <th>Rumah Sakit</th>}
                       <th>Kategori</th>
                       <th>Nama Layanan</th>
                       <th>Kelas Kamar</th>
-                      {showRS && <th>Rumah Sakit</th>}
-                      <th>Tahun</th>
                       <th className="left">Tarif</th>
                     </tr>
                   </thead>
