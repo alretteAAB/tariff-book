@@ -849,11 +849,11 @@ export default function App() {
                     )}
                     {!loading && sortedResults.map((r, i) => (
                       <tr key={i}>
+                        <td><span className="td-tahun">{r.tahun}</span></td>
+                        {showRS && <td><span className="td-rs">{r.rumah_sakit}</span></td>}
                         <td><span className="td-kategori">{r.kategori_harga.replace('TARIF ', '')}</span></td>
                         <td><span className="td-layanan">{highlight(r.nama_layanan, query)}</span></td>
                         <td><span className="td-kelas">{r.kelas_kamar}</span></td>
-                        {showRS && <td><span className="td-rs">{r.rumah_sakit}</span></td>}
-                        <td><span className="td-tahun">{r.tahun}</span></td>
                         <td><span className="td-tarif">{formatRupiah(r.tarif)}</span></td>
                       </tr>
                     ))}
