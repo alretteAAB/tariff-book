@@ -63,24 +63,24 @@ const styles = `
   .header-title {
     font-size: 22px; font-weight: 700;
     color: var(--brown); letter-spacing: -0.3px;
-    text-align : left;
+    text-align: left;
   }
   .header-sub {
     font-size: 13px; color: var(--text-muted);
     margin-top: 2px; font-weight: 400;
-    text-align = left;
+    text-align: left;
   }
 
   /* MAIN */
   .app {
-  width: 100%;
-  max-width: 100%;
-}
+    width: 100%;
+    max-width: 100%;
+  }
 
-.main {
-  max-width: 100%;
-  padding: 40px 40px 80px;  /* samakan padding kiri-kanan dengan header */
-}
+  .main {
+    max-width: 100%;
+    padding: 40px 40px 80px;  /* samakan padding kiri-kanan dengan header */
+  }
 
   /* SEARCH CARD */
   .search-card {
@@ -610,10 +610,11 @@ function MultiSelectDropdown({ label, options, selected, onChange, formatLabel }
 // ─── Main App ───────────────────────────────────────────────────────
 export default function App() {
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState({ kategori: [], rumah_sakit: [], tahun: [] });
+  const [filters, setFilters] = useState({ kategori: [], rumah_sakit: [], tahun: [], kelas_kamar: [] });
   const [selectedKategori, setSelectedKategori] = useState([]);
   const [selectedRS, setSelectedRS] = useState([]);
   const [selectedTahun, setSelectedTahun] = useState([]);
+  const [selectedKelas, setSelectedKelas] = useState([]);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -623,6 +624,7 @@ export default function App() {
   const suggDebounce = useRef(null);
   const inputRef = useRef(null);
   const suggRef = useRef(null);
+  
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
   const scrollToBottom = () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
@@ -644,12 +646,13 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  function buildParams(q, kat, rs, thn) {
+  function buildParams(q, kat, rs, thn, kls) {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     kat.forEach(k => params.append('kategori', k));
     rs.forEach(r => params.append('rumah_sakit', r));
     thn.forEach(t => params.append('tahun', t));
+    kls.forEach(c => params.append('kelas_kamar', c)); 
     return params.toString();
   }
 
@@ -658,14 +661,14 @@ export default function App() {
     if (!q.trim()) { setSuggestions([]); setShowSugg(false); return; }
     suggDebounce.current = setTimeout(async () => {
       try {
-        const p = buildParams(q, selectedKategori, selectedRS, selectedTahun);
+        const p = buildParams(q, selectedKategori, selectedRS, selectedTahun, selectedKelas);
         const res = await fetch(`${API}/suggest?${p}`);
         const data = await res.json();
         setSuggestions(data);
         setShowSugg(data.length > 0);
       } catch { setSuggestions([]); }
     }, 250);
-  }, [selectedKategori, selectedRS, selectedTahun]);
+  }, [selectedKategori, selectedRS, selectedTahun, selectedKelas]);
 
   const handleQueryChange = (e) => {
     const val = e.target.value;
@@ -680,7 +683,7 @@ export default function App() {
     setLoading(true);
     setSearched(true);
     try {
-      const p = buildParams(q, selectedKategori, selectedRS, selectedTahun);
+      const p = buildParams(q, selectedKategori, selectedRS, selectedTahun, selectedKelas);
       const res = await fetch(`${API}/search?${p}`);
       const data = await res.json();
       setResults(data);
@@ -715,12 +718,14 @@ export default function App() {
     ...selectedKategori.map(k => ({ type: 'kategori', val: k, label: k.replace('TARIF ', '') })),
     ...selectedRS.map(r => ({ type: 'rs', val: r, label: r })),
     ...selectedTahun.map(t => ({ type: 'tahun', val: t, label: `Tahun ${t}` })),
+    ...selectedKelas.map(c => ({ type: 'kelas', val: c, label: `Kelas ${c}` })), 
   ];
 
   const removeChip = (chip) => {
     if (chip.type === 'kategori') setSelectedKategori(v => v.filter(x => x !== chip.val));
     if (chip.type === 'rs') setSelectedRS(v => v.filter(x => x !== chip.val));
     if (chip.type === 'tahun') setSelectedTahun(v => v.filter(x => x !== chip.val));
+    if (chip.type === 'kelas') setSelectedKelas(v => v.filter(x => x !== chip.val)); 
   };
 
   const showRS = filters.rumah_sakit?.length > 0;
@@ -801,6 +806,12 @@ export default function App() {
                 onChange={setSelectedTahun}
                 formatLabel={v => String(v)}
               />
+              <MultiSelectDropdown
+                label="Kelas Kamar"
+                options={filters.kelas_kamar || []}
+                selected={selectedKelas}
+                onChange={setSelectedKelas}
+              />
             </div>
 
             {activeChips.length > 0 && (
@@ -864,7 +875,7 @@ export default function App() {
                       <tr>
                         <td colSpan={showRS ? 6 : 5} style={{ padding: '48px', textAlign: 'center' }}>
                           <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
-                          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: 'var(--brown)', marginBottom: 6 }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--brown)', marginBottom: 6 }}>
                             Tidak ada hasil
                           </div>
                           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
@@ -889,6 +900,7 @@ export default function App() {
             </>
           )}
         </main>
+        
         <div className="scroll-btns">
           <button className="scroll-btn" onClick={scrollToTop} title="Ke Atas">↑</button>
           <button className="scroll-btn" onClick={scrollToBottom} title="Ke Bawah">↓</button>
