@@ -380,9 +380,11 @@ const styles = `
     background: var(--white);
     border-radius: var(--radius);
     border: 1px solid var(--cream-border);
-    overflow: hidden; box-shadow: var(--shadow);
+    overflow-x: auto;
+    box-shadow: var(--shadow);
   }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table { min-width: 600px; width: 100%; border-collapse: collapse; font-size: 14px; }
+  
   thead tr {
     background: linear-gradient(135deg, #f5ede0, #ede0cc);
     border-bottom: 2px solid var(--cream-border);
@@ -448,6 +450,31 @@ const styles = `
   .state-sub {
     font-size: 14px; color: var(--text-muted);
     max-width: 320px; margin: 0 auto; line-height: 1.6;
+  }
+  
+  .scroll-btns {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 999;
+  }
+  .scroll-btn {
+    width: 44px; height: 44px;
+    background: var(--gold);
+    color: var(--white);
+    border: none; border-radius: 50%;
+    font-size: 20px; font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(201,151,44,0.4);
+    transition: transform 0.2s, background 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scroll-btn:hover {
+    background: var(--gold-dark);
+    transform: scale(1.1);
   }
 
   /* LOADING */
@@ -596,6 +623,8 @@ export default function App() {
   const suggDebounce = useRef(null);
   const inputRef = useRef(null);
   const suggRef = useRef(null);
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  const scrollToBottom = () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
   useEffect(() => {
     fetch(`${API}/filters`)
@@ -860,6 +889,10 @@ export default function App() {
             </>
           )}
         </main>
+        <div className="scroll-btns">
+          <button className="scroll-btn" onClick={scrollToTop} title="Ke Atas">↑</button>
+          <button className="scroll-btn" onClick={scrollToBottom} title="Ke Bawah">↓</button>
+        </div>
       </div>
     </>
   );
