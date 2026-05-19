@@ -42,34 +42,44 @@ app.get('/filters', async (req, res) => {
 // GET /search
 app.get('/search', async (req, res) => {
   const { q } = req.query;
-  if (!q || q.trim() === '') return res.json([]);
 
   const kategoriFilter = parseMulti(req.query.kategori);
   const rsFilter = parseMulti(req.query.rumah_sakit);
   const tahunFilter = parseMulti(req.query.tahun).map(Number);
   const kelasFilter = parseMulti(req.query.kelas_kamar);
 
-  try {
-    let i = 2;
-    const params = [`%${q}%`];
-    let where = `WHERE nama_layanan ILIKE $1`;
+  // Kalau ga ada query dan ga ada filter apapun, return kosong
+  const hasQ = q && q.trim() !== '';
+  const hasFilter = kategoriFilter.length || rsFilter.length || tahunFilter.length || kelasFilter.length;
+  if (!hasQ && !hasFilter) return res.json([]);
 
+  try {
+    const conditions = [];
+    const params = [];
+    let i = 1;
+
+    if (hasQ) {
+      params.push(`%${q.trim()}%`);
+      conditions.push(`nama_layanan ILIKE $${i++}`);
+    }
     if (kategoriFilter.length) {
       params.push(kategoriFilter);
-      where += ` AND kategori_harga = ANY($${i++})`;
+      conditions.push(`kategori_harga = ANY($${i++})`);
     }
     if (rsFilter.length) {
       params.push(rsFilter);
-      where += ` AND rumah_sakit = ANY($${i++})`;
+      conditions.push(`rumah_sakit = ANY($${i++})`);
     }
     if (tahunFilter.length) {
       params.push(tahunFilter);
-      where += ` AND tahun = ANY($${i++})`;
+      conditions.push(`tahun = ANY($${i++})`);
     }
     if (kelasFilter.length) {
       params.push(kelasFilter);
-      where += ` AND kelas_kamar = ANY($${i++})`;
+      conditions.push(`kelas_kamar = ANY($${i++})`);
     }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const sql = `
       SELECT kategori_harga, nama_layanan, kelas_kamar, tarif, rumah_sakit, tahun

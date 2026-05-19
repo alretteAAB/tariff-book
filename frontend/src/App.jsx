@@ -710,7 +710,8 @@ export default function App() {
 
   const handleSearch = async (overrideQ) => {
     const q = overrideQ ?? query;
-    if (!q.trim()) return;
+    const hasFilter = selectedKategori.length || selectedRS.length || selectedTahun.length || selectedKelas.length;
+    if (!q.trim() && !hasFilter) return;
     setShowSugg(false);
     setLoading(true);
     setSearched(true);
@@ -785,7 +786,7 @@ export default function App() {
                   ref={inputRef}
                   className="search-input"
                   type="text"
-                  placeholder="Cari nama layanan... (contoh: CT Scan, ICU, MRI)"
+                  placeholder="Cari nama layanan... (atau pilih filter di bawah)"
                   value={query}
                   onChange={handleQueryChange}
                   onKeyDown={e => e.key === 'Enter' && handleSearch()}
@@ -810,7 +811,7 @@ export default function App() {
               <button
                 className="search-btn"
                 onClick={() => handleSearch()}
-                disabled={loading || !query.trim()}
+                disabled={loading || (!query.trim() && !selectedKategori.length && !selectedRS.length && !selectedTahun.length && !selectedKelas.length)}
               >
                 {loading ? "Mencari..." : "Cari"}
               </button>
@@ -862,7 +863,7 @@ export default function App() {
             <div className="state-box">
               <div className="state-icon">🔎</div>
               <div className="state-title">Cari Layanan Medis</div>
-              <div className="state-sub">Ketik nama tindakan atau layanan, pilih filter jika perlu, lalu tekan Cari.</div>
+              <div className="state-sub">Ketik nama tindakan atau layanan, atau pilih filter saja lalu tekan Cari.</div>
             </div>
           )}
 
