@@ -79,7 +79,7 @@ const styles = `
 
   .main {
     max-width: 100%;
-    padding: 40px 40px 80px;  /* samakan padding kiri-kanan dengan header */
+    padding: 40px 40px 80px;
   }
 
   /* SEARCH CARD */
@@ -100,17 +100,17 @@ const styles = `
   .search-row {
     display: flex; 
     gap: 12px;
-    align-items: stretch; /* Biar tinggi input & tombol sama */
-    flex-wrap: nowrap; /* Jangan turun ke bawah kalau di desktop */
+    align-items: stretch;
+    flex-wrap: nowrap;
   }
   
   .input-wrap {
-    flex: 1; /* Input ambil semua sisa ruang */
+    flex: 1;
   }
 
   .search-btn {
-    padding: 0 40px; /* Lebarin tombol dikit biar makin tegas */
-    height: 48px; /* Samakan dengan tinggi input */
+    padding: 0 40px;
+    height: 48px;
   }
 
   /* INPUT WRAP */
@@ -492,7 +492,7 @@ const styles = `
     .header { padding: 20px; }
     .main { padding: 24px 16px 60px; }
     .search-row {
-      flex-direction: column; /* Tumpuk ke bawah kalau di HP */
+      flex-direction: column;
     }
     .search-card { padding: 20px; }
     .search-btn { width: 100%; }
@@ -610,7 +610,7 @@ function MultiSelectDropdown({ label, options, selected, onChange, formatLabel }
 // ─── Main App ───────────────────────────────────────────────────────
 export default function App() {
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState({ kategori: [], rumah_sakit: [], tahun: [], kelas_kamar: [] });
+  const [filters, setFilters] = useState({ kategori: [], rumah_sakit: [], tahun: [], kelas_kamar: [], relations: [] });
   const [selectedKategori, setSelectedKategori] = useState([]);
   const [selectedRS, setSelectedRS] = useState([]);
   const [selectedTahun, setSelectedTahun] = useState([]);
@@ -624,7 +624,7 @@ export default function App() {
   const suggDebounce = useRef(null);
   const inputRef = useRef(null);
   const suggRef = useRef(null);
-  
+
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
   const scrollToBottom = () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
@@ -646,13 +646,45 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // ─── Cascading filter logic ───────────────────────────────────────
+  const relations = filters.relations || [];
+
+  // RS yang tersedia berdasarkan kategori yang dipilih
+  const availableRS = selectedKategori.length > 0
+    ? filters.rumah_sakit.filter(rs =>
+        relations.some(r => selectedKategori.includes(r.kategori_harga) && r.rumah_sakit === rs)
+      )
+    : filters.rumah_sakit;
+
+  // Kategori yang tersedia berdasarkan RS yang dipilih
+  const availableKategori = selectedRS.length > 0
+    ? filters.kategori.filter(k =>
+        relations.some(r => selectedRS.includes(r.rumah_sakit) && r.kategori_harga === k)
+      )
+    : filters.kategori;
+
+  // Auto-clear RS yang tidak valid kalau kategori berubah
+  useEffect(() => {
+    if (availableRS.length > 0) {
+      setSelectedRS(prev => prev.filter(rs => availableRS.includes(rs)));
+    }
+  }, [selectedKategori]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-clear kategori yang tidak valid kalau RS berubah
+  useEffect(() => {
+    if (availableKategori.length > 0) {
+      setSelectedKategori(prev => prev.filter(k => availableKategori.includes(k)));
+    }
+  }, [selectedRS]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ─────────────────────────────────────────────────────────────────
+
   function buildParams(q, kat, rs, thn, kls) {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     kat.forEach(k => params.append('kategori', k));
     rs.forEach(r => params.append('rumah_sakit', r));
     thn.forEach(t => params.append('tahun', t));
-    kls.forEach(c => params.append('kelas_kamar', c)); 
+    kls.forEach(c => params.append('kelas_kamar', c));
     return params.toString();
   }
 
@@ -718,14 +750,14 @@ export default function App() {
     ...selectedKategori.map(k => ({ type: 'kategori', val: k, label: k.replace('TARIF ', '') })),
     ...selectedRS.map(r => ({ type: 'rs', val: r, label: r })),
     ...selectedTahun.map(t => ({ type: 'tahun', val: t, label: `Tahun ${t}` })),
-    ...selectedKelas.map(c => ({ type: 'kelas', val: c, label: `Kelas ${c}` })), 
+    ...selectedKelas.map(c => ({ type: 'kelas', val: c, label: `Kelas ${c}` })),
   ];
 
   const removeChip = (chip) => {
     if (chip.type === 'kategori') setSelectedKategori(v => v.filter(x => x !== chip.val));
     if (chip.type === 'rs') setSelectedRS(v => v.filter(x => x !== chip.val));
     if (chip.type === 'tahun') setSelectedTahun(v => v.filter(x => x !== chip.val));
-    if (chip.type === 'kelas') setSelectedKelas(v => v.filter(x => x !== chip.val)); 
+    if (chip.type === 'kelas') setSelectedKelas(v => v.filter(x => x !== chip.val));
   };
 
   const showRS = filters.rumah_sakit?.length > 0;
@@ -787,14 +819,14 @@ export default function App() {
             <div className="filter-row">
               <MultiSelectDropdown
                 label="Kategori"
-                options={filters.kategori || []}
+                options={availableKategori}
                 selected={selectedKategori}
                 onChange={setSelectedKategori}
               />
               {showRS && (
                 <MultiSelectDropdown
                   label="Rumah Sakit"
-                  options={filters.rumah_sakit || []}
+                  options={availableRS}
                   selected={selectedRS}
                   onChange={setSelectedRS}
                 />
