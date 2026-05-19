@@ -15,22 +15,23 @@ function parseMulti(val) {
   return val.split(',').map(v => v.trim()).filter(Boolean);
 }
 
-// GET /filters — semua distinct values untuk dropdown
+// GET /filters — semua distinct values untuk dropdown + relasi kategori↔rumah_sakit
 app.get('/filters', async (req, res) => {
   try {
-    // Tambahin query buat narik data kelas_kamar
-    const [kategori, rumahSakit, tahun, kelasKamar] = await Promise.all([
+    const [kategori, rumahSakit, tahun, kelasKamar, relations] = await Promise.all([
       pool.query('SELECT DISTINCT kategori_harga FROM tarif ORDER BY kategori_harga ASC'),
       pool.query('SELECT DISTINCT rumah_sakit FROM tarif ORDER BY rumah_sakit ASC'),
       pool.query('SELECT DISTINCT tahun FROM tarif ORDER BY tahun DESC'),
-      pool.query('SELECT DISTINCT kelas_kamar FROM tarif WHERE kelas_kamar IS NOT NULL ORDER BY kelas_kamar ASC')
+      pool.query('SELECT DISTINCT kelas_kamar FROM tarif WHERE kelas_kamar IS NOT NULL ORDER BY kelas_kamar ASC'),
+      pool.query('SELECT DISTINCT kategori_harga, rumah_sakit FROM tarif ORDER BY kategori_harga, rumah_sakit')
     ]);
-    
+
     res.json({
       kategori: kategori.rows.map(r => r.kategori_harga),
       rumah_sakit: rumahSakit.rows.map(r => r.rumah_sakit),
       tahun: tahun.rows.map(r => r.tahun),
-      kelas_kamar: kelasKamar.rows.map(r => r.kelas_kamar) // Kirim ke frontend
+      kelas_kamar: kelasKamar.rows.map(r => r.kelas_kamar),
+      relations: relations.rows // [{ kategori_harga, rumah_sakit }]
     });
   } catch (err) {
     console.error(err);
@@ -46,7 +47,7 @@ app.get('/search', async (req, res) => {
   const kategoriFilter = parseMulti(req.query.kategori);
   const rsFilter = parseMulti(req.query.rumah_sakit);
   const tahunFilter = parseMulti(req.query.tahun).map(Number);
-  const kelasFilter = parseMulti(req.query.kelas_kamar); // Nangkep param kelas_kamar
+  const kelasFilter = parseMulti(req.query.kelas_kamar);
 
   try {
     let i = 2;
@@ -65,7 +66,6 @@ app.get('/search', async (req, res) => {
       params.push(tahunFilter);
       where += ` AND tahun = ANY($${i++})`;
     }
-    // Tambahin logic WHERE buat kelas kamar
     if (kelasFilter.length) {
       params.push(kelasFilter);
       where += ` AND kelas_kamar = ANY($${i++})`;
@@ -95,7 +95,7 @@ app.get('/suggest', async (req, res) => {
   const kategoriFilter = parseMulti(req.query.kategori);
   const rsFilter = parseMulti(req.query.rumah_sakit);
   const tahunFilter = parseMulti(req.query.tahun).map(Number);
-  const kelasFilter = parseMulti(req.query.kelas_kamar); // Nangkep param kelas_kamar
+  const kelasFilter = parseMulti(req.query.kelas_kamar);
 
   try {
     let i = 2;
@@ -114,7 +114,6 @@ app.get('/suggest', async (req, res) => {
       params.push(tahunFilter);
       where += ` AND tahun = ANY($${i++})`;
     }
-    // Tambahin logic WHERE buat kelas kamar di suggest
     if (kelasFilter.length) {
       params.push(kelasFilter);
       where += ` AND kelas_kamar = ANY($${i++})`;
