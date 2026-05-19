@@ -51,7 +51,11 @@ app.get('/search', async (req, res) => {
   // Kalau ga ada query dan ga ada filter apapun, return kosong
   const hasQ = q && q.trim() !== '';
   const hasFilter = kategoriFilter.length || rsFilter.length || tahunFilter.length || kelasFilter.length;
-  if (!hasQ && !hasFilter) return res.json([]);
+  if (!hasQ && !hasFilter) return res.json({ data: [], total: 0, page: 1, totalPages: 0 });
+
+  const PAGE_SIZE = 50;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
 
   try {
     const conditions = [];
@@ -81,16 +85,29 @@ app.get('/search', async (req, res) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const sql = `
-      SELECT kategori_harga, nama_layanan, kelas_kamar, tarif, rumah_sakit, tahun
-      FROM tarif
-      ${where}
-      ORDER BY nama_layanan ASC, tarif DESC
-      LIMIT 100
-    `;
+    // Jalanin query data + count paralel
+    const [result, countResult] = await Promise.all([
+      pool.query(
+        `SELECT kategori_harga, nama_layanan, kelas_kamar, tarif, rumah_sakit, tahun
+         FROM tarif
+         ${where}
+         ORDER BY nama_layanan ASC, tarif DESC
+         LIMIT $${i} OFFSET $${i + 1}`,
+        [...params, PAGE_SIZE, offset]
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM tarif ${where}`,
+        params
+      )
+    ]);
 
-    const result = await pool.query(sql, params);
-    res.json(result.rows);
+    const total = parseInt(countResult.rows[0].count);
+    res.json({
+      data: result.rows,
+      total,
+      page,
+      totalPages: Math.ceil(total / PAGE_SIZE)
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

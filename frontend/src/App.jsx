@@ -487,6 +487,37 @@ const styles = `
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* PAGINATION */
+  .pagination {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; margin-top: 24px; flex-wrap: wrap;
+  }
+  .page-btn {
+    min-width: 36px; height: 36px; padding: 0 10px;
+    border: 1.5px solid var(--cream-border);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500;
+    color: var(--text-muted); cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .page-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold-dark); }
+  .page-btn.active {
+    background: var(--gold); border-color: var(--gold);
+    color: var(--white); font-weight: 700;
+  }
+  .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .page-ellipsis {
+    font-size: 13px; color: var(--text-muted);
+    padding: 0 4px; line-height: 36px;
+  }
+  .pagination-info {
+    text-align: center; margin-top: 10px;
+    font-size: 12px; color: var(--text-muted);
+  }
+
   /* RESPONSIVE */
   @media (max-width: 680px) {
     .header { padding: 20px; }
@@ -607,6 +638,46 @@ function MultiSelectDropdown({ label, options, selected, onChange, formatLabel }
   );
 }
 
+// ─── Pagination ─────────────────────────────────────────────────────
+function Pagination({ page, totalPages, onPage }) {
+  if (totalPages <= 1) return null;
+
+  const pages = [];
+  const delta = 2;
+  const left = page - delta;
+  const right = page + delta;
+
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= left && i <= right)) {
+      pages.push(i);
+    }
+  }
+
+  const withEllipsis = [];
+  let prev = null;
+  for (const p of pages) {
+    if (prev && p - prev > 1) withEllipsis.push('...');
+    withEllipsis.push(p);
+    prev = p;
+  }
+
+  return (
+    <div className="pagination">
+      <button className="page-btn" onClick={() => onPage(page - 1)} disabled={page === 1}>‹</button>
+      {withEllipsis.map((p, i) =>
+        p === '...'
+          ? <span key={`e${i}`} className="page-ellipsis">…</span>
+          : <button
+              key={p}
+              className={`page-btn ${p === page ? 'active' : ''}`}
+              onClick={() => onPage(p)}
+            >{p}</button>
+      )}
+      <button className="page-btn" onClick={() => onPage(page + 1)} disabled={page === totalPages}>›</button>
+    </div>
+  );
+}
+
 // ─── Main App ───────────────────────────────────────────────────────
 export default function App() {
   const [query, setQuery] = useState("");
@@ -616,6 +687,9 @@ export default function App() {
   const [selectedTahun, setSelectedTahun] = useState([]);
   const [selectedKelas, setSelectedKelas] = useState([]);
   const [results, setResults] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [sort, setSort] = useState("desc");
@@ -678,13 +752,14 @@ export default function App() {
   }, [selectedRS]); // eslint-disable-line react-hooks/exhaustive-deps
   // ─────────────────────────────────────────────────────────────────
 
-  function buildParams(q, kat, rs, thn, kls) {
+  function buildParams(q, kat, rs, thn, kls, pg = 1) {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     kat.forEach(k => params.append('kategori', k));
     rs.forEach(r => params.append('rumah_sakit', r));
     thn.forEach(t => params.append('tahun', t));
     kls.forEach(c => params.append('kelas_kamar', c));
+    params.set('page', pg);
     return params.toString();
   }
 
@@ -708,24 +783,30 @@ export default function App() {
     fetchSuggestions(val);
   };
 
-  const handleSearch = async (overrideQ) => {
+  const handleSearch = async (overrideQ, pg = 1) => {
     const q = overrideQ ?? query;
     const hasFilter = selectedKategori.length || selectedRS.length || selectedTahun.length || selectedKelas.length;
     if (!q.trim() && !hasFilter) return;
     setShowSugg(false);
     setLoading(true);
     setSearched(true);
+    setPage(pg);
     try {
-      const p = buildParams(q, selectedKategori, selectedRS, selectedTahun, selectedKelas);
+      const p = buildParams(q, selectedKategori, selectedRS, selectedTahun, selectedKelas, pg);
       const res = await fetch(`${API}/search?${p}`);
       const data = await res.json();
-      setResults(data);
+      setResults(data.data);
+      setTotal(data.total);
+      setTotalPages(data.totalPages);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+    scrollToTop();
   };
+
+  const goToPage = (pg) => handleSearch(query, pg);
 
   const handleSuggClick = (nama) => {
     setQuery(nama);
@@ -738,6 +819,7 @@ export default function App() {
     setQuery(""); setResults([]);
     setSearched(false); setSuggestions([]);
     setShowSugg(false);
+    setPage(1); setTotal(0); setTotalPages(0);
     inputRef.current?.focus();
   };
 
@@ -872,7 +954,8 @@ export default function App() {
               {!loading && results.length > 0 && (
                 <div className="results-meta">
                   <div className="results-count">
-                    Menampilkan <span>{results.length}</span> hasil untuk "<span>{query}</span>"
+                    Menampilkan <span>{(page - 1) * 50 + 1}–{(page - 1) * 50 + results.length}</span> dari <span>{total}</span> hasil
+                    {query && <> untuk "<span>{query}</span>"</>}
                   </div>
                   <div className="sort-group">
                     Urutkan harga:
@@ -930,6 +1013,10 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+              <Pagination page={page} totalPages={totalPages} onPage={goToPage} />
+              {totalPages > 1 && !loading && (
+                <div className="pagination-info">Halaman {page} dari {totalPages}</div>
+              )}
             </>
           )}
         </main>
