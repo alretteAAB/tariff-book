@@ -913,6 +913,13 @@ export default function App() {
             </div>
 
             <div className="filter-row">
+              <MultiSelectDropdown
+                label="Tahun"
+                options={filters.tahun || []}
+                selected={selectedTahun}
+                onChange={setSelectedTahun}
+                formatLabel={v => String(v)}
+              />
               {showRS && (
                 <MultiSelectDropdown
                   label="Rumah Sakit"
@@ -926,13 +933,6 @@ export default function App() {
                 options={availableKategori}
                 selected={selectedKategori}
                 onChange={setSelectedKategori}
-              />
-              <MultiSelectDropdown
-                label="Tahun"
-                options={filters.tahun || []}
-                selected={selectedTahun}
-                onChange={setSelectedTahun}
-                formatLabel={v => String(v)}
               />
               <MultiSelectDropdown
                 label="Kelas Kamar"
