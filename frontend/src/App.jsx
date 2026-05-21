@@ -681,7 +681,7 @@ function Pagination({ page, totalPages, onPage }) {
 // ─── Main App ───────────────────────────────────────────────────────
 export default function App() {
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState({ kategori: [], rumah_sakit: [], tahun: [], kelas_kamar: [], relations: [] });
+  const [filters, setFilters] = useState({ kategori: [], rumah_sakit: [], tahun: [], kelas_kamar: [], relations: [], kelas_relations: [] });
   const [selectedKategori, setSelectedKategori] = useState([]);
   const [selectedRS, setSelectedRS] = useState([]);
   const [selectedTahun, setSelectedTahun] = useState([]);
@@ -722,6 +722,7 @@ export default function App() {
 
   // ─── Cascading filter logic ───────────────────────────────────────
   const relations = filters.relations || [];
+  const kelasRelations = filters.kelas_relations || [];
 
   // RS yang tersedia berdasarkan kategori yang dipilih
   const availableRS = selectedKategori.length > 0
@@ -737,6 +738,13 @@ export default function App() {
       )
     : filters.kategori;
 
+  // Kelas kamar yang tersedia berdasarkan RS yang dipilih
+  const availableKelas = selectedRS.length > 0
+    ? filters.kelas_kamar.filter(k =>
+        kelasRelations.some(r => selectedRS.includes(r.rumah_sakit) && r.kelas_kamar === k)
+      )
+    : filters.kelas_kamar;
+
   // Auto-clear RS yang tidak valid kalau kategori berubah
   useEffect(() => {
     if (availableRS.length > 0) {
@@ -749,6 +757,11 @@ export default function App() {
     if (availableKategori.length > 0) {
       setSelectedKategori(prev => prev.filter(k => availableKategori.includes(k)));
     }
+  }, [selectedRS]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-clear kelas kamar yang tidak valid kalau RS berubah
+  useEffect(() => {
+    setSelectedKelas(prev => prev.filter(k => availableKelas.includes(k)));
   }, [selectedRS]); // eslint-disable-line react-hooks/exhaustive-deps
   // ─────────────────────────────────────────────────────────────────
 
@@ -900,12 +913,6 @@ export default function App() {
             </div>
 
             <div className="filter-row">
-              <MultiSelectDropdown
-                label="Kategori"
-                options={availableKategori}
-                selected={selectedKategori}
-                onChange={setSelectedKategori}
-              />
               {showRS && (
                 <MultiSelectDropdown
                   label="Rumah Sakit"
@@ -915,6 +922,12 @@ export default function App() {
                 />
               )}
               <MultiSelectDropdown
+                label="Kategori"
+                options={availableKategori}
+                selected={selectedKategori}
+                onChange={setSelectedKategori}
+              />
+              <MultiSelectDropdown
                 label="Tahun"
                 options={filters.tahun || []}
                 selected={selectedTahun}
@@ -923,7 +936,7 @@ export default function App() {
               />
               <MultiSelectDropdown
                 label="Kelas Kamar"
-                options={filters.kelas_kamar || []}
+                options={availableKelas}
                 selected={selectedKelas}
                 onChange={setSelectedKelas}
               />
