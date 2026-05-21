@@ -15,15 +15,16 @@ function parseMulti(val) {
   return val.split(',').map(v => v.trim()).filter(Boolean);
 }
 
-// GET /filters — semua distinct values untuk dropdown + relasi kategori↔rumah_sakit
+// GET /filters — semua distinct values untuk dropdown + relasi kategori↔rumah_sakit + relasi kelas_kamar↔rumah_sakit
 app.get('/filters', async (req, res) => {
   try {
-    const [kategori, rumahSakit, tahun, kelasKamar, relations] = await Promise.all([
+    const [kategori, rumahSakit, tahun, kelasKamar, relations, kelasRelations] = await Promise.all([
       pool.query('SELECT DISTINCT kategori_harga FROM tarif ORDER BY kategori_harga ASC'),
       pool.query('SELECT DISTINCT rumah_sakit FROM tarif ORDER BY rumah_sakit ASC'),
       pool.query('SELECT DISTINCT tahun FROM tarif ORDER BY tahun DESC'),
       pool.query('SELECT DISTINCT kelas_kamar FROM tarif WHERE kelas_kamar IS NOT NULL ORDER BY kelas_kamar ASC'),
-      pool.query('SELECT DISTINCT kategori_harga, rumah_sakit FROM tarif ORDER BY kategori_harga, rumah_sakit')
+      pool.query('SELECT DISTINCT kategori_harga, rumah_sakit FROM tarif ORDER BY kategori_harga, rumah_sakit'),
+      pool.query('SELECT DISTINCT kelas_kamar, rumah_sakit FROM tarif WHERE kelas_kamar IS NOT NULL ORDER BY kelas_kamar, rumah_sakit')
     ]);
 
     res.json({
@@ -31,7 +32,8 @@ app.get('/filters', async (req, res) => {
       rumah_sakit: rumahSakit.rows.map(r => r.rumah_sakit),
       tahun: tahun.rows.map(r => r.tahun),
       kelas_kamar: kelasKamar.rows.map(r => r.kelas_kamar),
-      relations: relations.rows // [{ kategori_harga, rumah_sakit }]
+      relations: relations.rows,           // [{ kategori_harga, rumah_sakit }]
+      kelas_relations: kelasRelations.rows  // [{ kelas_kamar, rumah_sakit }]
     });
   } catch (err) {
     console.error(err);
