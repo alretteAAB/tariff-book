@@ -941,7 +941,8 @@ export default function App() {
                 onChange={setSelectedKelas}
               />
             </div>
-
+            <div className="header-sub">Direkomendasikan untuk menggunakan filter dari kiri ke kanan</div>
+            <div className="header-sub">Pilih Tahun > Rumah Sakit > Kategori > Kelas Kamar</div>
             {activeChips.length > 0 && (
               <div className="active-filters">
                 {activeChips.map((chip, i) => (
