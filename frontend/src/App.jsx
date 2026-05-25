@@ -518,6 +518,26 @@ const styles = `
     font-size: 12px; color: var(--text-muted);
   }
 
+  /* FILTER GUIDANCE */
+  /* FIX: class sendiri biar tidak nyampur sama .header-sub yang warnanya terlalu muted */
+  .filter-guidance {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(201,151,44,0.07);
+    border-left: 3px solid var(--gold);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .filter-guidance p {
+    font-size: 12px;
+    color: var(--brown-light);
+    font-weight: 500;
+    line-height: 1.6;
+  }
+  .filter-guidance p:first-child {
+    font-weight: 600;
+    color: var(--gold-dark);
+  }
+
   /* RESPONSIVE */
   @media (max-width: 680px) {
     .header { padding: 20px; }
@@ -692,12 +712,19 @@ export default function App() {
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  // FIX #4: sort state sekarang dikirim ke backend, default 'desc'
   const [sort, setSort] = useState("desc");
+
   const [suggestions, setSuggestions] = useState([]);
   const [showSugg, setShowSugg] = useState(false);
   const suggDebounce = useRef(null);
   const inputRef = useRef(null);
   const suggRef = useRef(null);
+
+  // FIX #5: guard ref untuk cascading filter, cegah wipe saat mount awal
+  const isMountedKategori = useRef(false);
+  const isMountedRS = useRef(false);
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
   const scrollToBottom = () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -724,48 +751,43 @@ export default function App() {
   const relations = filters.relations || [];
   const kelasRelations = filters.kelas_relations || [];
 
-  // RS yang tersedia berdasarkan kategori yang dipilih
   const availableRS = selectedKategori.length > 0
     ? filters.rumah_sakit.filter(rs =>
         relations.some(r => selectedKategori.includes(r.kategori_harga) && r.rumah_sakit === rs)
       )
     : filters.rumah_sakit;
 
-  // Kategori yang tersedia berdasarkan RS yang dipilih
   const availableKategori = selectedRS.length > 0
     ? filters.kategori.filter(k =>
         relations.some(r => selectedRS.includes(r.rumah_sakit) && r.kategori_harga === k)
       )
     : filters.kategori;
 
-  // Kelas kamar yang tersedia berdasarkan RS yang dipilih
   const availableKelas = selectedRS.length > 0
     ? filters.kelas_kamar.filter(k =>
         kelasRelations.some(r => selectedRS.includes(r.rumah_sakit) && r.kelas_kamar === k)
       )
     : filters.kelas_kamar;
 
-  // Auto-clear RS yang tidak valid kalau kategori berubah
+  // FIX #5: skip wipe pada render pertama (sebelum filters dari API datang)
   useEffect(() => {
+    if (!isMountedKategori.current) { isMountedKategori.current = true; return; }
     if (availableRS.length > 0) {
       setSelectedRS(prev => prev.filter(rs => availableRS.includes(rs)));
     }
   }, [selectedKategori]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-clear kategori yang tidak valid kalau RS berubah
   useEffect(() => {
+    if (!isMountedRS.current) { isMountedRS.current = true; return; }
     if (availableKategori.length > 0) {
       setSelectedKategori(prev => prev.filter(k => availableKategori.includes(k)));
     }
-  }, [selectedRS]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-clear kelas kamar yang tidak valid kalau RS berubah
-  useEffect(() => {
     setSelectedKelas(prev => prev.filter(k => availableKelas.includes(k)));
   }, [selectedRS]); // eslint-disable-line react-hooks/exhaustive-deps
   // ─────────────────────────────────────────────────────────────────
 
-  function buildParams(q, kat, rs, thn, kls, pg = 1) {
+  // FIX #3 & #4: tambah sort ke params supaya backend yang sort, bukan frontend
+  function buildParams(q, kat, rs, thn, kls, pg = 1, sortOrder = 'desc') {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     kat.forEach(k => params.append('kategori', k));
@@ -773,6 +795,7 @@ export default function App() {
     thn.forEach(t => params.append('tahun', t));
     kls.forEach(c => params.append('kelas_kamar', c));
     params.set('page', pg);
+    params.set('sort', sortOrder); // FIX: sort dikirim ke backend
     return params.toString();
   }
 
@@ -796,7 +819,8 @@ export default function App() {
     fetchSuggestions(val);
   };
 
-  const handleSearch = async (overrideQ, pg = 1) => {
+  // FIX #6: sort reset ke 'desc' setiap kali search baru (bukan ganti halaman)
+  const handleSearch = async (overrideQ, pg = 1, overrideSort) => {
     const q = overrideQ ?? query;
     const hasFilter = selectedKategori.length || selectedRS.length || selectedTahun.length || selectedKelas.length;
     if (!q.trim() && !hasFilter) return;
@@ -804,8 +828,13 @@ export default function App() {
     setLoading(true);
     setSearched(true);
     setPage(pg);
+
+    // Reset sort hanya kalau ini search baru (pg === 1 dan tidak ada overrideSort)
+    const activeSort = overrideSort ?? (pg === 1 ? 'desc' : sort);
+    if (pg === 1 && overrideSort === undefined) setSort('desc');
+
     try {
-      const p = buildParams(q, selectedKategori, selectedRS, selectedTahun, selectedKelas, pg);
+      const p = buildParams(q, selectedKategori, selectedRS, selectedTahun, selectedKelas, pg, activeSort);
       const res = await fetch(`${API}/search?${p}`);
       const data = await res.json();
       setResults(data.data);
@@ -819,7 +848,13 @@ export default function App() {
     scrollToTop();
   };
 
-  const goToPage = (pg) => handleSearch(query, pg);
+  // FIX #3 & #4: saat user klik sort button, langsung re-fetch dengan sort baru
+  const handleSortChange = (newSort) => {
+    setSort(newSort);
+    handleSearch(query, 1, newSort);
+  };
+
+  const goToPage = (pg) => handleSearch(query, pg, sort);
 
   const handleSuggClick = (nama) => {
     setQuery(nama);
@@ -833,14 +868,9 @@ export default function App() {
     setSearched(false); setSuggestions([]);
     setShowSugg(false);
     setPage(1); setTotal(0); setTotalPages(0);
+    setSort("desc"); // FIX #6: reset sort saat clear
     inputRef.current?.focus();
   };
-
-  const sortedResults = [...results].sort((a, b) => {
-    const nc = a.nama_layanan.localeCompare(b.nama_layanan);
-    if (nc !== 0) return nc;
-    return sort === 'desc' ? b.tarif - a.tarif : a.tarif - b.tarif;
-  });
 
   const activeChips = [
     ...selectedKategori.map(k => ({ type: 'kategori', val: k, label: k.replace('TARIF ', '') })),
@@ -941,8 +971,13 @@ export default function App() {
                 onChange={setSelectedKelas}
               />
             </div>
-            <div className="header-sub">Direkomendasikan untuk menggunakan filter dari kiri ke kanan</div>
-            <div className="header-sub">Pilih Tahun > Rumah Sakit > Kategori > Kelas Kamar</div>
+
+            {/* FIX: Guidance pakai class sendiri, tidak invisible lagi */}
+            <div className="filter-guidance">
+              <p>💡 Gunakan filter dari kiri ke kanan untuk hasil terbaik</p>
+              <p>Pilih Tahun → Rumah Sakit → Kategori → Kelas Kamar</p>
+            </div>
+
             {activeChips.length > 0 && (
               <div className="active-filters">
                 {activeChips.map((chip, i) => (
@@ -973,10 +1008,11 @@ export default function App() {
                   </div>
                   <div className="sort-group">
                     Urutkan harga:
-                    <button className={`sort-btn ${sort === 'desc' ? 'active' : ''}`} onClick={() => setSort('desc')}>
+                    {/* FIX #3 & #4: sort sekarang trigger re-fetch ke backend */}
+                    <button className={`sort-btn ${sort === 'desc' ? 'active' : ''}`} onClick={() => handleSortChange('desc')}>
                       Termahal ↓
                     </button>
-                    <button className={`sort-btn ${sort === 'asc' ? 'active' : ''}`} onClick={() => setSort('asc')}>
+                    <button className={`sort-btn ${sort === 'asc' ? 'active' : ''}`} onClick={() => handleSortChange('asc')}>
                       Termurah ↑
                     </button>
                   </div>
@@ -1014,7 +1050,8 @@ export default function App() {
                         </td>
                       </tr>
                     )}
-                    {!loading && sortedResults.map((r, i) => (
+                    {/* FIX #3: tidak perlu sortedResults lagi, hasil sudah di-sort backend */}
+                    {!loading && results.map((r, i) => (
                       <tr key={i}>
                         <td><span className="td-tahun">{r.tahun}</span></td>
                         {showRS && <td><span className="td-rs">{r.rumah_sakit}</span></td>}
