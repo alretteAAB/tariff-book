@@ -65,7 +65,8 @@ app.get('/search', async (req, res) => {
     let i = 1;
 
     if (hasQ) {
-      params.push(`%${q.trim()}%`);
+      const escaped = q.trim().replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+      params.push(`%${escaped}%`);
       conditions.push(`nama_layanan ILIKE $${i++}`);
     }
     if (kategoriFilter.length) {
@@ -87,13 +88,15 @@ app.get('/search', async (req, res) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
+    const sortDir = req.query.sort === 'asc' ? 'ASC' : 'DESC';
+
     // Jalanin query data + count paralel
     const [result, countResult] = await Promise.all([
       pool.query(
         `SELECT kategori_harga, nama_layanan, kelas_kamar, tarif, rumah_sakit, tahun
          FROM tarif
          ${where}
-         ORDER BY nama_layanan ASC, tarif DESC
+         ORDER BY nama_layanan ASC, tarif ${sortDir}
          LIMIT $${i} OFFSET $${i + 1}`,
         [...params, PAGE_SIZE, offset]
       ),
@@ -128,7 +131,8 @@ app.get('/suggest', async (req, res) => {
 
   try {
     let i = 2;
-    const params = [`%${q}%`];
+    const escapedQ = q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+    const params = [`%${escapedQ}%`];
     let where = `WHERE nama_layanan ILIKE $1`;
 
     if (kategoriFilter.length) {

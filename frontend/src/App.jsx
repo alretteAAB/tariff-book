@@ -47,7 +47,7 @@ const styles = `
     border-bottom: 1px solid var(--cream-border);
     padding: 28px 40px;
     display: flex;
-    align-items: left;
+    align-items: center;
     gap: 16px;
     box-shadow: 0 2px 12px rgba(107,76,42,0.06);
   }
@@ -712,6 +712,7 @@ export default function App() {
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [error, setError] = useState(null);
 
   // FIX #4: sort state sekarang dikirim ke backend, default 'desc'
   const [sort, setSort] = useState("desc");
@@ -827,6 +828,7 @@ export default function App() {
     setShowSugg(false);
     setLoading(true);
     setSearched(true);
+    setError(null);
     setPage(pg);
 
     // Reset sort hanya kalau ini search baru (pg === 1 dan tidak ada overrideSort)
@@ -842,6 +844,7 @@ export default function App() {
       setTotalPages(data.totalPages);
     } catch (err) {
       console.error(err);
+      setError('Gagal memuat data. Periksa koneksi dan coba lagi.');
     } finally {
       setLoading(false);
     }
@@ -866,9 +869,9 @@ export default function App() {
   const handleClear = () => {
     setQuery(""); setResults([]);
     setSearched(false); setSuggestions([]);
-    setShowSugg(false);
+    setShowSugg(false); setError(null);
     setPage(1); setTotal(0); setTotalPages(0);
-    setSort("desc"); // FIX #6: reset sort saat clear
+    setSort("desc");
     inputRef.current?.focus();
   };
 
@@ -921,8 +924,8 @@ export default function App() {
                 {query && <button className="clear-btn" onClick={handleClear}>✕</button>}
                 {showSugg && (
                   <div className="suggestions" ref={suggRef}>
-                    {suggestions.map((s, i) => (
-                      <div key={i} className="suggestion-item" onMouseDown={() => handleSuggClick(s.nama_layanan)}>
+                    {suggestions.map((s) => (
+                      <div key={s.nama_layanan} className="suggestion-item" onMouseDown={() => handleSuggClick(s.nama_layanan)}>
                         <span className="suggestion-icon">↗</span>
                         <div>
                           <div className="suggestion-text">{highlight(s.nama_layanan, query)}</div>
@@ -980,8 +983,8 @@ export default function App() {
 
             {activeChips.length > 0 && (
               <div className="active-filters">
-                {activeChips.map((chip, i) => (
-                  <div key={i} className="filter-chip">
+                {activeChips.map((chip) => (
+                  <div key={`${chip.type}-${chip.val}`} className="filter-chip">
                     {chip.label}
                     <button className="chip-remove" onClick={() => removeChip(chip)}>✕</button>
                   </div>
@@ -989,6 +992,14 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {error && (
+            <div className="state-box" style={{ borderColor: '#f5c6cb', background: '#fff5f5' }}>
+              <div className="state-icon">⚠️</div>
+              <div className="state-title" style={{ color: '#c0392b' }}>Terjadi Kesalahan</div>
+              <div className="state-sub">{error}</div>
+            </div>
+          )}
 
           {!searched && !loading && (
             <div className="state-box">
@@ -1028,7 +1039,7 @@ export default function App() {
                       <th>Kategori</th>
                       <th>Nama Layanan</th>
                       <th>Kelas Kamar</th>
-                      <th className="left">Tarif</th>
+                      <th className="right">Tarif</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1052,7 +1063,7 @@ export default function App() {
                     )}
                     {/* FIX #3: tidak perlu sortedResults lagi, hasil sudah di-sort backend */}
                     {!loading && results.map((r, i) => (
-                      <tr key={i}>
+                      <tr key={`${r.nama_layanan}-${r.rumah_sakit}-${r.tahun}-${r.kelas_kamar}-${r.tarif}-${i}`}>
                         <td><span className="td-tahun">{r.tahun}</span></td>
                         {showRS && <td><span className="td-rs">{r.rumah_sakit}</span></td>}
                         <td><span className="td-kategori">{r.kategori_harga.replace('TARIF ', '')}</span></td>
