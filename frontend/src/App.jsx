@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 const API = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -25,9 +25,9 @@ const styles = `
     --white: #fff;
     --radius: 8px;
     --radius-sm: 5px;
-    --font-display: 'Cormorant Garamond', Georgia, serif;
-    --font-body: 'Outfit', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+    --font-display: 'Lato', sans-serif;
+    --font-body: 'Lato', sans-serif;
+    --font-mono: 'Lato', sans-serif;
     --shadow: 0 2px 12px rgba(0,0,0,0.07);
     --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
   }
@@ -443,16 +443,13 @@ const styles = `
   }
   .td-rs { font-size: 11px; color: var(--text-muted); }
   .td-tahun {
-    font-family: var(--font-mono);
-    font-size: 12px; font-weight: 500;
+    font-size: 13px; font-weight: 400;
     color: var(--text-muted);
   }
   .td-tarif {
     text-align: right;
-    font-family: var(--font-mono);
-    font-size: 14px; font-weight: 600;
+    font-size: 13px; font-weight: 700;
     color: var(--gold); white-space: nowrap;
-    letter-spacing: -0.5px;
   }
 
   /* ─── STATES ──────────────────────────────────────── */
