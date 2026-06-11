@@ -1100,7 +1100,7 @@ export default function App() {
                         <td><span className="td-kategori">{r.kategori_harga.replace('TARIF ', '')}</span></td>
                         <td><span className="td-layanan">{highlight(r.nama_layanan, query)}</span></td>
                         <td><span className="td-kelas">{r.kelas_kamar}</span></td>
-                        <td><span className="td-tarif">{formatRupiah(r.tarif)}</span></td>
+                        <td style={{ textAlign: 'right' }}><span className="td-tarif">{formatRupiah(r.tarif)}</span></td>
                       </tr>
                     ))}
                   </tbody>
