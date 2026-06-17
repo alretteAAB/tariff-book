@@ -1,5 +1,0 @@
-# Copy this file to `.dev.vars` for local `wrangler pages dev`.
-# wrangler injects these into the Pages Functions as `env.SUPABASE_URL` etc.
-# `.dev.vars` is gitignored — never commit real keys.
-SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_ANON_KEY=your-anon-key

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-const API = "/api";
+const API = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap');
