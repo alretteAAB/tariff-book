@@ -149,3 +149,7 @@ backend/node_modules/
 # frontend
 frontend/.env
 frontend/node_modules/
+
+# Cloudflare Pages Functions local dev secrets
+.dev.vars
+frontend/.dev.vars

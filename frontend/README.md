@@ -1,16 +1,40 @@
-# React + Vite
+# Buku Tarif — Frontend + API
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The deployable unit of the app: a React + Vite single-page app plus the
+Cloudflare Pages Functions that back it. See the [root README](../README.md)
+for the full architecture overview.
 
-Currently, two official plugins are available:
+## Layout
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `src/` — the React app ([App.jsx](src/App.jsx) holds the UI and all `/api` calls).
+- `functions/api/` — Cloudflare Pages Functions, served at `/api/*`:
+  - `filters.js`, `search.js`, `suggest.js`.
 
-## React Compiler
+The React app talks only to relative `/api/*` URLs; the Functions talk to
+Supabase using `@supabase/supabase-js`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Scripts
 
-## Expanding the ESLint configuration
+| Command | What it does |
+|---------|--------------|
+| `npm run dev` | Vite dev server with HMR (proxies `/api/*` → `localhost:8788`) |
+| `npm run build` | Builds the static app into `dist/` |
+| `npm run preview` | Serves the built `dist/` |
+| `npm run lint` | Runs ESLint |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+> `npm run build` only builds the frontend. The Functions in `functions/` are
+> bundled separately by Cloudflare on deploy (or run locally via wrangler).
+
+## Running the API locally
+
+The Functions need `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Locally these come
+from a `.dev.vars` file (gitignored):
+
+```bash
+cp .dev.vars.example .dev.vars   # then fill in your Supabase keys
+npm run build
+npx wrangler pages dev ./dist --port 8788
+```
+
+Run `npm run dev` in another terminal for a hot-reloading frontend that proxies
+API calls to the wrangler server on port 8788.
