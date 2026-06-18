@@ -472,7 +472,8 @@ const styles = `
     vertical-align: middle; user-select: none;
     transition: border-color 0.15s, color 0.15s;
   }
-  .info-tip:hover, .info-tip:focus { border-color: var(--gold); color: var(--gold); outline: none; }
+  .info-tip:focus { outline: none; }
+  .info-tip.open { border-color: var(--gold); color: var(--gold); }
   .info-tip-box {
     position: absolute;
     top: calc(100% + 8px); right: 0;
@@ -498,9 +499,16 @@ const styles = `
     border: 6px solid transparent;
     border-bottom-color: var(--border-mid);
   }
-  .info-tip:hover .info-tip-box,
-  .info-tip:focus .info-tip-box {
+  .info-tip.open .info-tip-box {
     opacity: 1; visibility: visible; transform: translateY(0);
+  }
+  /* Hover preview only on devices that truly hover (mouse), so touch taps
+     rely solely on the toggle and never get stuck open. */
+  @media (hover: hover) {
+    .info-tip:hover { border-color: var(--gold); color: var(--gold); }
+    .info-tip:hover .info-tip-box {
+      opacity: 1; visibility: visible; transform: translateY(0);
+    }
   }
 
   /* ─── STATES ──────────────────────────────────────── */
@@ -638,6 +646,43 @@ function formatRupiah(num) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency", currency: "IDR", minimumFractionDigits: 0
   }).format(num);
+}
+
+// ─── InfoTip ────────────────────────────────────────────────────────
+// Click/tap to toggle; tap outside or Escape to close. Works on touch
+// (where CSS :hover sticks) because visibility is driven by the `open`
+// class, not :hover/:focus.
+function InfoTip({ label, children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  return (
+    <span
+      ref={ref}
+      className={`info-tip ${open ? "open" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      aria-expanded={open}
+      onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); }
+        else if (e.key === "Escape") setOpen(false);
+      }}
+    >
+      i
+      <span className="info-tip-box">{children}</span>
+    </span>
+  );
 }
 
 // ─── MultiSelectDropdown ────────────────────────────────────────────
@@ -1124,14 +1169,11 @@ export default function App() {
                       <th className="right">Tarif</th>
                       <th className="right">
                         % vs Last Year
-                        <span className="info-tip" tabIndex={0} role="img" aria-label="Informasi kolom kenaikan harga">
-                          i
-                          <span className="info-tip-box">
-                            Perubahan harga dibandingkan tahun sebelumnya.
-                            Tanda “—” berarti tidak ada data tahun lalu untuk item yang sama
-                            dengan kelas kamar dan kategori harga yang sama.
-                          </span>
-                        </span>
+                        <InfoTip label="Informasi kolom kenaikan harga">
+                          Perubahan harga dibandingkan tahun sebelumnya.
+                          Tanda “—” berarti tidak ada data tahun lalu untuk item yang sama
+                          dengan kelas kamar dan kategori harga yang sama.
+                        </InfoTip>
                       </th>
                     </tr>
                   </thead>
