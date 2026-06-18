@@ -621,7 +621,6 @@ const styles = `
     .search-card { padding: 16px; }
     .search-btn { width: 100%; text-align: center; justify-content: center; }
     th, td { padding: 10px 12px; }
-    .td-rs, .td-tahun { display: none; }
     .header-title { font-size: 20px; }
   }
 `;
