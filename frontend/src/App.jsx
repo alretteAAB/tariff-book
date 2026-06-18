@@ -451,6 +451,10 @@ const styles = `
     font-size: 13px; font-weight: 700;
     color: var(--gold); white-space: nowrap;
   }
+  .td-pct {
+    font-size: 13px; color: var(--text-muted);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
 
   /* ─── STATES ──────────────────────────────────────── */
   .state-box {
@@ -1072,17 +1076,18 @@ export default function App() {
                       <th>Nama Layanan</th>
                       <th>Kelas Kamar</th>
                       <th className="right">Tarif</th>
+                      <th className="right">Kenaikan</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading && (
                       <tr className="loading-row">
-                        <td colSpan={showRS ? 6 : 5}><div className="spinner" /></td>
+                        <td colSpan={showRS ? 7 : 6}><div className="spinner" /></td>
                       </tr>
                     )}
                     {!loading && results.length === 0 && (
                       <tr>
-                        <td colSpan={showRS ? 6 : 5} style={{ padding: '52px', textAlign: 'center' }}>
+                        <td colSpan={showRS ? 7 : 6} style={{ padding: '52px', textAlign: 'center' }}>
                           <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.5 }}>🔍</div>
                           <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>
                             Tidak ada hasil
@@ -1101,6 +1106,7 @@ export default function App() {
                         <td><span className="td-layanan">{highlight(r.nama_layanan, query)}</span></td>
                         <td><span className="td-kelas">{r.kelas_kamar}</span></td>
                         <td style={{ textAlign: 'right' }}><span className="td-tarif">{formatRupiah(r.tarif)}</span></td>
+                        <td style={{ textAlign: 'right' }}><span className="td-pct">{r.pct_increase != null ? `${r.pct_increase}%` : '—'}</span></td>
                       </tr>
                     ))}
                   </tbody>

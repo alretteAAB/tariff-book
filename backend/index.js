@@ -67,23 +67,23 @@ app.get('/search', async (req, res) => {
     if (hasQ) {
       const escaped = q.trim().replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
       params.push(`%${escaped}%`);
-      conditions.push(`nama_layanan ILIKE $${i++}`);
+      conditions.push(`t.nama_layanan ILIKE $${i++}`);
     }
     if (kategoriFilter.length) {
       params.push(kategoriFilter);
-      conditions.push(`kategori_harga = ANY($${i++})`);
+      conditions.push(`t.kategori_harga = ANY($${i++})`);
     }
     if (rsFilter.length) {
       params.push(rsFilter);
-      conditions.push(`rumah_sakit = ANY($${i++})`);
+      conditions.push(`t.rumah_sakit = ANY($${i++})`);
     }
     if (tahunFilter.length) {
       params.push(tahunFilter);
-      conditions.push(`tahun = ANY($${i++})`);
+      conditions.push(`t.tahun = ANY($${i++})`);
     }
     if (kelasFilter.length) {
       params.push(kelasFilter);
-      conditions.push(`kelas_kamar = ANY($${i++})`);
+      conditions.push(`t.kelas_kamar = ANY($${i++})`);
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -93,15 +93,25 @@ app.get('/search', async (req, res) => {
     // Jalanin query data + count paralel
     const [result, countResult] = await Promise.all([
       pool.query(
-        `SELECT kategori_harga, nama_layanan, kelas_kamar, tarif, rumah_sakit, tahun
-         FROM tarif
+        `SELECT t.kategori_harga, t.nama_layanan, t.kelas_kamar, t.tarif,
+                t.rumah_sakit, t.tahun,
+                CASE
+                  WHEN t.tahun = 2026 AND p.tarif IS NOT NULL AND p.tarif <> 0
+                  THEN ROUND(((t.tarif - p.tarif) * 100.0 / p.tarif), 2)
+                END AS pct_increase
+         FROM tarif t
+         LEFT JOIN tarif p
+                ON t.nama_layanan = p.nama_layanan
+               AND t.kategori_harga = p.kategori_harga
+               AND t.kelas_kamar IS NOT DISTINCT FROM p.kelas_kamar
+               AND p.tahun = 2025
          ${where}
-         ORDER BY nama_layanan ASC, tarif ${sortDir}
+         ORDER BY t.nama_layanan ASC, t.tarif ${sortDir}
          LIMIT $${i} OFFSET $${i + 1}`,
         [...params, PAGE_SIZE, offset]
       ),
       pool.query(
-        `SELECT COUNT(*) FROM tarif ${where}`,
+        `SELECT COUNT(*) FROM tarif t ${where}`,
         params
       )
     ]);
