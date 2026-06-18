@@ -456,6 +456,53 @@ const styles = `
     font-variant-numeric: tabular-nums; white-space: nowrap;
   }
 
+  /* ─── INFO TOOLTIP ────────────────────────────────── */
+  .info-tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    width: 14px; height: 14px;
+    margin-left: 5px;
+    border: 1px solid var(--border-mid);
+    border-radius: 50%;
+    color: var(--text-muted);
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 10px; font-weight: 700; font-style: italic;
+    line-height: 1; cursor: help;
+    vertical-align: middle; user-select: none;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .info-tip:hover, .info-tip:focus { border-color: var(--gold); color: var(--gold); outline: none; }
+  .info-tip-box {
+    position: absolute;
+    top: calc(100% + 8px); right: 0;
+    width: 240px;
+    background: var(--card);
+    border: 1px solid var(--border-mid);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    padding: 10px 12px;
+    font-family: var(--font-body);
+    font-size: 11px; font-weight: 400; line-height: 1.55;
+    color: var(--text-muted);
+    text-align: left; text-transform: none; letter-spacing: normal;
+    white-space: normal; z-index: 300;
+    opacity: 0; visibility: hidden;
+    transform: translateY(-4px);
+    transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
+  }
+  .info-tip-box::before {
+    content: '';
+    position: absolute;
+    bottom: 100%; right: 4px;
+    border: 6px solid transparent;
+    border-bottom-color: var(--border-mid);
+  }
+  .info-tip:hover .info-tip-box,
+  .info-tip:focus .info-tip-box {
+    opacity: 1; visibility: visible; transform: translateY(0);
+  }
+
   /* ─── STATES ──────────────────────────────────────── */
   .state-box {
     background: var(--card);
@@ -1076,7 +1123,17 @@ export default function App() {
                       <th>Nama Layanan</th>
                       <th>Kelas Kamar</th>
                       <th className="right">Tarif</th>
-                      <th className="right">% vs Last Year</th>
+                      <th className="right">
+                        % vs Last Year
+                        <span className="info-tip" tabIndex={0} role="img" aria-label="Informasi kolom kenaikan harga">
+                          i
+                          <span className="info-tip-box">
+                            Perubahan harga dibandingkan tahun sebelumnya.
+                            Tanda “—” berarti tidak ada data tahun lalu untuk item yang sama
+                            dengan kelas kamar dan kategori harga yang sama.
+                          </span>
+                        </span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
