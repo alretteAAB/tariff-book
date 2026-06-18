@@ -1076,7 +1076,7 @@ export default function App() {
                       <th>Nama Layanan</th>
                       <th>Kelas Kamar</th>
                       <th className="right">Tarif</th>
-                      <th className="right">Kenaikan</th>
+                      <th className="right">% vs Last Year</th>
                     </tr>
                   </thead>
                   <tbody>
