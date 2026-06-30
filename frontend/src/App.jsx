@@ -1587,12 +1587,12 @@ export default function App() {
 
           {searched && (
             <>
-              {results.length > 0 && (
+              {/* {results.length > 0 && (
                 <div className="view-tabs">
                   <button className={`view-tab ${view === 'list' ? 'active' : ''}`} onClick={() => setView('list')}>Daftar</button>
                   <button className={`view-tab ${view === 'compare' ? 'active' : ''}`} onClick={() => setView('compare')}>Bandingkan</button>
                 </div>
-              )}
+              )} */}
 
               {view === 'compare' && results.length > 0 ? (
                 <CompareView apiParams={committedParams} axes={compareAxes} showRS={showRS} />
