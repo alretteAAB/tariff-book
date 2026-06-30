@@ -213,6 +213,54 @@ function csvCell(v) {
   return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+function escapeXml(v) {
+  if (v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Bangun file Excel SpreadsheetML 2003 (XML) tanpa dependensi.
+// Dibuka langsung oleh Excel/LibreOffice/Google Sheets, mendukung header tebal
+// serta format angka (#,##0) dan persen (0.00%).
+function buildSpreadsheetML(rows) {
+  const numCell = (v, styleId) =>
+    v == null || v === '' ? '<Cell/>'
+      : `<Cell${styleId ? ` ss:StyleID="${styleId}"` : ''}><Data ss:Type="Number">${v}</Data></Cell>`;
+  const strCell = (v) => `<Cell><Data ss:Type="String">${escapeXml(v)}</Data></Cell>`;
+
+  const headerRow = `<Row>${EXPORT_HEADERS
+    .map(h => `<Cell ss:StyleID="hdr"><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`)
+    .join('')}</Row>`;
+
+  const bodyRows = rows.map(r => {
+    const pct = r.pct_increase != null ? r.pct_increase / 100 : null;
+    return '<Row>' + [
+      numCell(r.tahun),
+      strCell(r.rumah_sakit),
+      strCell((r.kategori_harga || '').replace('TARIF ', '')),
+      strCell(r.nama_layanan),
+      strCell(r.kelas_kamar),
+      numCell(r.tarif, 'rp'),
+      numCell(pct, 'pct'),
+    ].join('') + '</Row>';
+  }).join('');
+
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'
+    + '<?mso-application progid="Excel.Sheet"?>\n'
+    + '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n'
+    + '<Styles>'
+    + '<Style ss:ID="hdr"><Font ss:Bold="1"/></Style>'
+    + '<Style ss:ID="rp"><NumberFormat ss:Format="#,##0"/></Style>'
+    + '<Style ss:ID="pct"><NumberFormat ss:Format="0.00%"/></Style>'
+    + '</Styles>\n'
+    + '<Worksheet ss:Name="Buku Tarif"><Table>\n'
+    + headerRow + '\n' + bodyRows + '\n'
+    + '</Table></Worksheet>\n</Workbook>';
+}
+
 app.get('/export', async (req, res) => {
   const { where, params, orderBy, hasAny } = buildTarifQuery(req.query);
   if (!hasAny) return res.status(400).json({ error: 'Tidak ada filter atau kata kunci untuk diekspor' });
@@ -227,39 +275,10 @@ app.get('/export', async (req, res) => {
     );
 
     if (format === 'xlsx') {
-      let ExcelJS;
-      try { ExcelJS = require('exceljs'); }
-      catch { return res.status(500).json({ error: 'Modul exceljs belum terpasang. Jalankan: npm install' }); }
-
-      const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet('Buku Tarif');
-      ws.columns = [
-        { header: 'Tahun', key: 'tahun', width: 8 },
-        { header: 'Rumah Sakit', key: 'rumah_sakit', width: 24 },
-        { header: 'Kategori', key: 'kategori', width: 18 },
-        { header: 'Nama Layanan', key: 'nama_layanan', width: 44 },
-        { header: 'Kelas Kamar', key: 'kelas_kamar', width: 14 },
-        { header: 'Tarif', key: 'tarif', width: 16, style: { numFmt: '#,##0' } },
-        { header: '% vs Tahun Lalu', key: 'pct', width: 16 },
-      ];
-      ws.getRow(1).font = { bold: true };
-      for (const r of rows) {
-        ws.addRow({
-          tahun: r.tahun,
-          rumah_sakit: r.rumah_sakit,
-          kategori: (r.kategori_harga || '').replace('TARIF ', ''),
-          nama_layanan: r.nama_layanan,
-          kelas_kamar: r.kelas_kamar,
-          tarif: r.tarif,
-          pct: r.pct_increase != null ? r.pct_increase / 100 : null,
-        });
-      }
-      ws.getColumn('pct').numFmt = '0.00%';
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename="buku-tarif-${stamp}.xlsx"`);
-      await wb.xlsx.write(res);
-      return res.end();
+      const xml = buildSpreadsheetML(rows);
+      res.setHeader('Content-Type', 'application/vnd.ms-excel; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="buku-tarif-${stamp}.xls"`);
+      return res.send(xml);
     }
 
     // CSV (default)
