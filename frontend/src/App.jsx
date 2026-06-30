@@ -1223,7 +1223,6 @@ export default function App() {
   const inputRef = useRef(null);
   const suggRef = useRef(null);
 
-  const isMountedKategori = useRef(false);
   const isMountedRS = useRef(false);
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1264,11 +1263,9 @@ export default function App() {
   const relations = filters.relations || [];
   const kelasRelations = filters.kelas_relations || [];
 
-  const availableRS = selectedKategori.length > 0
-    ? filters.rumah_sakit.filter(rs =>
-        relations.some(r => selectedKategori.includes(r.kategori_harga) && r.rumah_sakit === rs)
-      )
-    : filters.rumah_sakit;
+  // Rumah Sakit selalu menampilkan semua opsi — pilihan Kategori/Kelas Kamar
+  // TIDAK menghilangkan kandidat Rumah Sakit (dependensi satu arah saja).
+  const availableRS = filters.rumah_sakit;
 
   const availableKategori = selectedRS.length > 0
     ? filters.kategori.filter(k =>
@@ -1282,13 +1279,7 @@ export default function App() {
       )
     : filters.kelas_kamar;
 
-  useEffect(() => {
-    if (!isMountedKategori.current) { isMountedKategori.current = true; return; }
-    if (availableRS.length > 0) {
-      setSelectedRS(prev => prev.filter(rs => availableRS.includes(rs)));
-    }
-  }, [selectedKategori]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  // Saat Rumah Sakit berubah, buang pilihan Kategori/Kelas Kamar yang tak lagi tersedia
   useEffect(() => {
     if (!isMountedRS.current) { isMountedRS.current = true; return; }
     if (availableKategori.length > 0) {
