@@ -336,10 +336,44 @@ const styles = `
   }
   .filter-guidance-close:hover { color: var(--text-muted); }
 
-  /* ─── ACTIVE FILTER CHIPS ─────────────────────────── */
+  /* ─── ACTIVE FILTER TABLE ─────────────────────────── */
   .active-filters {
+    display: flex; flex-direction: column;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .filter-group-row {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    align-items: center; gap: 10px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .filter-group-row:last-child { border-bottom: none; }
+  .filter-group-name {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text-muted);
+  }
+  .filter-group-values {
     display: flex; flex-wrap: wrap; gap: 5px;
-    margin-top: 10px;
+  }
+  .filter-group-clear {
+    background: none; border: 1px solid var(--border);
+    color: var(--text-dim); cursor: pointer;
+    width: 20px; height: 20px; border-radius: 50%;
+    font-size: 10px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.12s, color 0.12s;
+    flex-shrink: 0;
+  }
+  .filter-group-clear:hover { border-color: var(--gold); color: var(--gold); }
+  @media (max-width: 680px) {
+    .filter-group-row { grid-template-columns: 90px 1fr auto; }
+    .filter-group-name { font-size: 9px; }
   }
   .filter-chip {
     display: inline-flex; align-items: center; gap: 5px;
@@ -445,6 +479,67 @@ const styles = `
     border: 1px solid var(--border); border-radius: 4px;
   }
   .sort-panel-actions .msd-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ─── VIEW TABS ───────────────────────────────────── */
+  .view-tabs {
+    display: inline-flex; gap: 2px; margin-bottom: 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 3px;
+  }
+  .view-tab {
+    padding: 6px 18px; border: none; background: none;
+    font-family: var(--font-body); font-size: 12px; font-weight: 600;
+    color: var(--text-muted); cursor: pointer; border-radius: 4px;
+    transition: background 0.12s, color 0.12s; letter-spacing: 0.3px;
+  }
+  .view-tab:hover { color: var(--text); }
+  .view-tab.active { background: var(--gold); color: #fff; }
+
+  /* ─── EXPORT ──────────────────────────────────────── */
+  .results-tools { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .export-group {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text-muted); letter-spacing: 0.4px;
+  }
+  .export-btn {
+    padding: 4px 12px; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    font-family: var(--font-body); font-size: 11px; font-weight: 600;
+    color: var(--text-muted); cursor: pointer; transition: all 0.12s;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .export-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+  .export-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ─── COMPARE / PIVOT ─────────────────────────────── */
+  .compare-bar {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    margin-bottom: 13px; font-size: 11px; color: var(--text-muted);
+    letter-spacing: 0.4px;
+  }
+  .compare-note { color: var(--text-dim); font-size: 11px; margin-left: 6px; }
+  .pivot-table th.pivot-corner {
+    text-align: left; position: sticky; left: 0; z-index: 2;
+    background: var(--surface);
+  }
+  .pivot-head {
+    position: sticky; left: 0; z-index: 1;
+    background: var(--card);
+    border-right: 1px solid var(--border-mid);
+    min-width: 230px; max-width: 320px;
+  }
+  tbody tr:hover .pivot-head { background: #fbf7ee; }
+  .pivot-name { font-weight: 600; color: var(--text); line-height: 1.3; }
+  .pivot-sub {
+    font-size: 10px; color: var(--text-muted); margin-top: 2px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .pivot-cell {
+    text-align: right; white-space: nowrap;
+    font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text);
+  }
+  .pivot-cell.cheapest { color: #2e7d32; font-weight: 700; background: rgba(46,125,50,0.08); }
+  .pivot-cell.priciest { color: var(--gold-dark); font-weight: 700; background: var(--gold-dim); }
 
   /* ─── TABLE ───────────────────────────────────────── */
   .table-wrap {
@@ -948,6 +1043,118 @@ function SortPanel({ fields, sortKeys, onChange }) {
   );
 }
 
+// ─── CompareView ────────────────────────────────────────────────────
+// Matriks perbandingan tarif: baris = layanan (+ dimensi tetap), kolom =
+// nilai sumbu terpilih. Sel termurah/termahal per baris disorot.
+function fixedLabel(fixed, hideRS) {
+  const order = ['rumah_sakit', 'tahun', 'kelas_kamar'];
+  return order
+    .filter(k => fixed[k] != null && fixed[k] !== '' && !(hideRS && k === 'rumah_sakit'))
+    .map(k => (k === 'kelas_kamar' ? `Kelas ${fixed[k]}` : String(fixed[k])))
+    .join(' · ');
+}
+
+function CompareView({ apiParams, axes, showRS }) {
+  const [axis, setAxis] = useState(axes[0]?.key || 'tahun');
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Jaga axis tetap valid bila daftar sumbu berubah
+  useEffect(() => {
+    if (!axes.some(a => a.key === axis)) setAxis(axes[0]?.key || 'tahun');
+  }, [axes, axis]);
+
+  useEffect(() => {
+    if (!apiParams) return;
+    let cancelled = false;
+    setLoading(true); setError(null);
+    fetch(`${API}/compare?${apiParams}&axis=${axis}`)
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setData(d); })
+      .catch(() => { if (!cancelled) setError('Gagal memuat perbandingan.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [apiParams, axis]);
+
+  const columns = data?.columns || [];
+
+  return (
+    <div>
+      <div className="compare-bar">
+        Bandingkan antar:
+        {axes.map(a => (
+          <button
+            key={a.key}
+            className={`sort-btn ${axis === a.key ? 'active' : ''}`}
+            onClick={() => setAxis(a.key)}
+          >
+            {a.label}
+          </button>
+        ))}
+        {data?.truncated && (
+          <span className="compare-note">Menampilkan {data.rows.length} dari {data.total} baris teratas</span>
+        )}
+      </div>
+
+      {error && (
+        <div className="state-box" style={{ padding: '40px' }}><div className="state-sub">{error}</div></div>
+      )}
+
+      {!error && (
+        <div className="table-wrap">
+          <table className="pivot-table">
+            <thead>
+              <tr>
+                <th className="pivot-corner">Layanan</th>
+                {columns.map(c => (
+                  <th key={c} className="right">{axis === 'kelas_kamar' ? `Kelas ${c}` : c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr className="loading-row"><td colSpan={columns.length + 1}><div className="spinner" /></td></tr>
+              )}
+              {!loading && (!data || data.rows.length === 0) && (
+                <tr>
+                  <td colSpan={Math.max(columns.length + 1, 1)} style={{ padding: '44px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    Tidak ada data untuk dibandingkan
+                  </td>
+                </tr>
+              )}
+              {!loading && data && data.rows.map((row, i) => {
+                const vals = columns.map(c => row.cells[c]).filter(v => v != null);
+                const min = vals.length ? Math.min(...vals) : null;
+                const max = vals.length ? Math.max(...vals) : null;
+                const multi = vals.length > 1;
+                return (
+                  <tr key={i}>
+                    <td className="pivot-head">
+                      <div className="pivot-name">{row.nama_layanan}</div>
+                      <div className="pivot-sub">
+                        {row.kategori_harga.replace('TARIF ', '')}
+                        {fixedLabel(row.fixed, !showRS) && <> · {fixedLabel(row.fixed, !showRS)}</>}
+                      </div>
+                    </td>
+                    {columns.map(c => {
+                      const v = row.cells[c];
+                      const cls = v == null ? '' : (multi && v === min ? 'cheapest' : (multi && v === max ? 'priciest' : ''));
+                      return (
+                        <td key={c} className={`pivot-cell ${cls}`}>{v != null ? formatRupiah(v) : '—'}</td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Pagination ─────────────────────────────────────────────────────
 function Pagination({ page, totalPages, onPage }) {
   if (totalPages <= 1) return null;
@@ -1005,6 +1212,10 @@ export default function App() {
   const [error, setError] = useState(null);
   const [sortKeys, setSortKeys] = useState(DEFAULT_SORT);
   const [showGuidance, setShowGuidance] = useState(true);
+  const [view, setView] = useState("list"); // 'list' | 'compare'
+  // Param pencarian yang sudah "dikomit" (dipakai untuk ekspor & banding,
+  // agar konsisten dengan hasil yang tampil — bukan kontrol live)
+  const [committedParams, setCommittedParams] = useState("");
 
   const [suggestions, setSuggestions] = useState([]);
   const [showSugg, setShowSugg] = useState(false);
@@ -1136,6 +1347,8 @@ export default function App() {
 
     try {
       const p = buildParams(q, selectedKategori, selectedRS, selectedTahun, selectedKelas, pg, keys);
+      // Snapshot param (tanpa peran page) untuk ekspor & banding
+      setCommittedParams(buildParams(q, selectedKategori, selectedRS, selectedTahun, selectedKelas, 1, keys));
       const res = await fetch(`${API}/search?${p}`);
       const data = await res.json();
       setResults(data.data);
@@ -1175,6 +1388,18 @@ export default function App() {
 
   const goToPage = (pg) => handleSearch(query, pg, sortKeys);
 
+  // Ekspor seluruh hasil terfilter (memakai snapshot param yang dikomit).
+  // Pakai anchor download agar tidak meninggalkan tab kosong.
+  const handleExport = (format) => {
+    if (!committedParams) return;
+    const a = document.createElement('a');
+    a.href = `${API}/export?${committedParams}&format=${format}`;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   const handleSuggClick = (nama) => {
     setQuery(nama);
     setSuggestions([]);
@@ -1188,15 +1413,17 @@ export default function App() {
     setShowSugg(false); setError(null);
     setPage(1); setTotal(0); setTotalPages(0);
     setSortKeys(DEFAULT_SORT);
+    setView("list"); setCommittedParams("");
     inputRef.current?.focus();
   };
 
-  const activeChips = [
-    ...selectedKategori.map(k => ({ type: 'kategori', val: k, label: k.replace('TARIF ', '') })),
-    ...selectedRS.map(r => ({ type: 'rs', val: r, label: r })),
-    ...selectedTahun.map(t => ({ type: 'tahun', val: t, label: `Tahun ${t}` })),
-    ...selectedKelas.map(c => ({ type: 'kelas', val: c, label: `Kelas ${c}` })),
-  ];
+  // Filter aktif dikelompokkan per kategori (ditampilkan sebagai tabel ringkas)
+  const filterGroups = [
+    { type: 'tahun', label: 'Tahun', values: selectedTahun, fmt: t => String(t) },
+    { type: 'rs', label: 'Rumah Sakit', values: selectedRS, fmt: r => r },
+    { type: 'kategori', label: 'Kategori', values: selectedKategori, fmt: k => k.replace('TARIF ', '') },
+    { type: 'kelas', label: 'Kelas Kamar', values: selectedKelas, fmt: c => String(c) },
+  ].filter(g => g.values.length > 0);
 
   const removeChip = (chip) => {
     if (chip.type === 'kategori') setSelectedKategori(v => v.filter(x => x !== chip.val));
@@ -1205,9 +1432,22 @@ export default function App() {
     if (chip.type === 'kelas') setSelectedKelas(v => v.filter(x => x !== chip.val));
   };
 
+  const clearGroup = (type) => {
+    if (type === 'kategori') setSelectedKategori([]);
+    if (type === 'rs') setSelectedRS([]);
+    if (type === 'tahun') setSelectedTahun([]);
+    if (type === 'kelas') setSelectedKelas([]);
+  };
+
   const showRS = filters.rumah_sakit?.length > 0;
   // Kolom Rumah Sakit hanya relevan saat datanya multi-RS
   const sortFields = SORT_FIELDS.filter(f => f.col !== 'rumah_sakit' || showRS);
+  // Sumbu perbandingan yang tersedia (RS hanya bila multi-RS)
+  const compareAxes = [
+    ...(showRS ? [{ key: 'rumah_sakit', label: 'Rumah Sakit' }] : []),
+    { key: 'tahun', label: 'Tahun' },
+    { key: 'kelas_kamar', label: 'Kelas Kamar' },
+  ];
 
   return (
     <>
@@ -1302,12 +1542,26 @@ export default function App() {
               </div>
             )}
 
-            {activeChips.length > 0 && (
+            {filterGroups.length > 0 && (
               <div className="active-filters">
-                {activeChips.map((chip) => (
-                  <div key={`${chip.type}-${chip.val}`} className="filter-chip">
-                    {chip.label}
-                    <button className="chip-remove" onClick={() => removeChip(chip)}>✕</button>
+                {filterGroups.map((group) => (
+                  <div key={group.type} className="filter-group-row">
+                    <div className="filter-group-name">{group.label}</div>
+                    <div className="filter-group-values">
+                      {group.values.map((val) => (
+                        <span key={String(val)} className="filter-chip">
+                          {group.fmt(val)}
+                          <button className="chip-remove" onClick={() => removeChip({ type: group.type, val })}>✕</button>
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      className="filter-group-clear"
+                      onClick={() => clearGroup(group.type)}
+                      title={`Hapus semua ${group.label}`}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1334,26 +1588,44 @@ export default function App() {
           {searched && (
             <>
               {results.length > 0 && (
+                <div className="view-tabs">
+                  <button className={`view-tab ${view === 'list' ? 'active' : ''}`} onClick={() => setView('list')}>Daftar</button>
+                  <button className={`view-tab ${view === 'compare' ? 'active' : ''}`} onClick={() => setView('compare')}>Bandingkan</button>
+                </div>
+              )}
+
+              {view === 'compare' && results.length > 0 ? (
+                <CompareView apiParams={committedParams} axes={compareAxes} showRS={showRS} />
+              ) : (
+              <>
+              {results.length > 0 && (
                 <div className="results-meta">
                   <div className="results-count">
                     Menampilkan <span>{(page - 1) * 50 + 1}–{(page - 1) * 50 + results.length}</span> dari <span>{total}</span> hasil
                     {query && <> untuk "<span>{query}</span>"</>}
                   </div>
-                  <div className="sort-group">
-                    Urutkan harga:
-                    <button
-                      className={`sort-btn ${sortKeys.length === 1 && sortKeys[0].col === 'tarif' && sortKeys[0].dir === 'desc' ? 'active' : ''}`}
-                      onClick={() => applySortKeys([{ col: 'tarif', dir: 'desc' }])}
-                    >
-                      Termahal ↓
-                    </button>
-                    <button
-                      className={`sort-btn ${sortKeys.length === 1 && sortKeys[0].col === 'tarif' && sortKeys[0].dir === 'asc' ? 'active' : ''}`}
-                      onClick={() => applySortKeys([{ col: 'tarif', dir: 'asc' }])}
-                    >
-                      Termurah ↑
-                    </button>
-                    <SortPanel fields={sortFields} sortKeys={sortKeys} onChange={applySortKeys} />
+                  <div className="results-tools">
+                    <div className="sort-group">
+                      Urutkan harga:
+                      <button
+                        className={`sort-btn ${sortKeys.length === 1 && sortKeys[0].col === 'tarif' && sortKeys[0].dir === 'desc' ? 'active' : ''}`}
+                        onClick={() => applySortKeys([{ col: 'tarif', dir: 'desc' }])}
+                      >
+                        Termahal ↓
+                      </button>
+                      <button
+                        className={`sort-btn ${sortKeys.length === 1 && sortKeys[0].col === 'tarif' && sortKeys[0].dir === 'asc' ? 'active' : ''}`}
+                        onClick={() => applySortKeys([{ col: 'tarif', dir: 'asc' }])}
+                      >
+                        Termurah ↑
+                      </button>
+                      <SortPanel fields={sortFields} sortKeys={sortKeys} onChange={applySortKeys} />
+                    </div>
+                    <div className="export-group">
+                      Ekspor:
+                      <button className="export-btn" onClick={() => handleExport('csv')} disabled={!committedParams}>⬇ CSV</button>
+                      <button className="export-btn" onClick={() => handleExport('xlsx')} disabled={!committedParams}>⬇ Excel</button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1413,6 +1685,8 @@ export default function App() {
               <Pagination page={page} totalPages={totalPages} onPage={goToPage} />
               {totalPages > 1 && !loading && (
                 <div className="pagination-info">Halaman {page} dari {totalPages}</div>
+              )}
+              </>
               )}
             </>
           )}
