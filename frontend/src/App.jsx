@@ -404,7 +404,8 @@ const styles = `
   }
 
   /* ─── SORT PANEL (urutan bertingkat) ──────────────── */
-  .sort-panel { min-width: 308px; max-width: 360px; padding: 8px; }
+  /* Anchor ke kanan agar tidak keluar dari tepi layar (trigger paling kanan) */
+  .sort-panel { min-width: 320px; max-width: 380px; padding: 8px; left: auto; right: 0; }
   .sort-level { display: flex; align-items: center; gap: 6px; padding: 5px 4px; }
   .sort-level-tag {
     font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
@@ -419,7 +420,8 @@ const styles = `
   }
   .sort-select:focus { border-color: var(--gold); }
   .sort-dir-btn {
-    padding: 5px 8px; min-width: 48px; flex-shrink: 0;
+    padding: 5px 8px; min-width: 86px; flex-shrink: 0;
+    white-space: nowrap; text-align: center;
     font-family: var(--font-body); font-size: 11px; font-weight: 600;
     color: var(--gold); background: var(--gold-dim);
     border: 1px solid rgba(138,96,16,0.22); border-radius: 4px;
@@ -926,7 +928,7 @@ function SortPanel({ fields, sortKeys, onChange }) {
                   {opts.map(f => <option key={f.col} value={f.col}>{f.label}</option>)}
                 </select>
                 <button className="sort-dir-btn" onClick={() => setLevel(i, { dir: k.dir === 'asc' ? 'desc' : 'asc' })}>
-                  {field.numeric ? (k.dir === 'asc' ? '0–9' : '9–0') : (k.dir === 'asc' ? 'A–Z' : 'Z–A')}
+                  {field.numeric ? (k.dir === 'asc' ? 'Smallest → Largest' : 'Largest → Smallest') : (k.dir === 'asc' ? 'A–Z' : 'Z–A')}
                 </button>
                 <div className="sort-level-actions">
                   <button onClick={() => move(i, -1)} disabled={i === 0} title="Naikkan prioritas">↑</button>
