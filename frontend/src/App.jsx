@@ -389,6 +389,61 @@ const styles = `
   }
   .sort-btn:not(.active):hover { border-color: var(--gold); color: var(--gold); }
 
+  /* ─── SORTABLE HEADERS ────────────────────────────── */
+  .th-sort { cursor: pointer; user-select: none; transition: color 0.12s, background 0.12s; }
+  .th-sort:hover { color: var(--gold); background: var(--gold-dim); }
+  .th-sort.active { color: var(--gold); }
+  .th-sort-inner { display: inline-flex; align-items: center; gap: 5px; }
+  .th-arrow { font-size: 9px; opacity: 0.4; }
+  .th-sort:hover .th-arrow, .th-sort.active .th-arrow { opacity: 1; }
+  .th-level {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 14px; height: 14px; padding: 0 3px;
+    background: var(--gold); color: #fff;
+    border-radius: 7px; font-size: 9px; font-weight: 700; line-height: 1;
+  }
+
+  /* ─── SORT PANEL (urutan bertingkat) ──────────────── */
+  .sort-panel { min-width: 308px; max-width: 360px; padding: 8px; }
+  .sort-level { display: flex; align-items: center; gap: 6px; padding: 5px 4px; }
+  .sort-level-tag {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-muted); width: 30px; flex-shrink: 0;
+  }
+  .sort-select {
+    flex: 1; min-width: 0; padding: 5px 7px;
+    font-family: var(--font-body); font-size: 12px;
+    color: var(--text); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 4px;
+    outline: none; cursor: pointer;
+  }
+  .sort-select:focus { border-color: var(--gold); }
+  .sort-dir-btn {
+    padding: 5px 8px; min-width: 48px; flex-shrink: 0;
+    font-family: var(--font-body); font-size: 11px; font-weight: 600;
+    color: var(--gold); background: var(--gold-dim);
+    border: 1px solid rgba(138,96,16,0.22); border-radius: 4px;
+    cursor: pointer; transition: background 0.12s;
+  }
+  .sort-dir-btn:hover { background: var(--gold-dim2); }
+  .sort-level-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .sort-level-actions button {
+    width: 22px; height: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text-muted); cursor: pointer;
+    font-size: 10px; line-height: 1; transition: border-color 0.12s, color 0.12s;
+  }
+  .sort-level-actions button:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+  .sort-level-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
+  .sort-panel-actions {
+    display: flex; gap: 6px; margin-top: 6px;
+    padding-top: 8px; border-top: 1px solid var(--border);
+  }
+  .sort-panel-actions .msd-action-btn {
+    border: 1px solid var(--border); border-radius: 4px;
+  }
+  .sort-panel-actions .msd-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
   /* ─── TABLE ───────────────────────────────────────── */
   .table-wrap {
     background: var(--card);
@@ -648,6 +703,23 @@ function formatRupiah(num) {
   }).format(num);
 }
 
+// Kolom yang bisa diurutkan (urutannya mengikuti urutan kolom tabel).
+// `numeric` menentukan arah default saat kolom pertama kali dipilih.
+const SORT_FIELDS = [
+  { col: 'tahun', label: 'Tahun', numeric: true },
+  { col: 'rumah_sakit', label: 'Rumah Sakit' },
+  { col: 'kategori_harga', label: 'Kategori' },
+  { col: 'nama_layanan', label: 'Nama Layanan' },
+  { col: 'kelas_kamar', label: 'Kelas Kamar' },
+  { col: 'tarif', label: 'Tarif', numeric: true },
+  { col: 'pct_increase', label: '% vs Tahun Lalu', numeric: true },
+];
+const DEFAULT_SORT = [{ col: 'nama_layanan', dir: 'asc' }];
+const defaultDirFor = (col) =>
+  SORT_FIELDS.find(f => f.col === col)?.numeric ? 'desc' : 'asc';
+// Serialisasi daftar urutan ke param query: "col:dir,col:dir"
+const serializeSort = (keys) => keys.map(k => `${k.col}:${k.dir}`).join(',');
+
 // ─── InfoTip ────────────────────────────────────────────────────────
 // Click/tap to toggle; tap outside or Escape to close. Works on touch
 // (where CSS :hover sticks) because visibility is driven by the `open`
@@ -682,6 +754,30 @@ function InfoTip({ label, children }) {
       i
       <span className="info-tip-box">{children}</span>
     </span>
+  );
+}
+
+// ─── SortableTh ─────────────────────────────────────────────────────
+// Klik header untuk mengurutkan seluruh hasil (server-side) berdasarkan
+// kolom ini; klik lagi untuk membalik arah.
+function SortableTh({ col, label, align, sortKeys, onSort, children }) {
+  const idx = sortKeys.findIndex(k => k.col === col);
+  const active = idx !== -1;
+  const dir = active ? sortKeys[idx].dir : null;
+  return (
+    <th
+      className={`th-sort ${align === 'right' ? 'right' : ''} ${active ? 'active' : ''}`}
+      onClick={(e) => onSort(col, e.shiftKey)}
+      title="Klik untuk urutkan · Shift+klik untuk urutan bertingkat"
+      aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <span className="th-sort-inner">
+        {label}
+        {children}
+        <span className="th-arrow">{active ? (dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+        {active && sortKeys.length > 1 && <span className="th-level">{idx + 1}</span>}
+      </span>
+    </th>
   );
 }
 
@@ -776,6 +872,80 @@ function MultiSelectDropdown({ label, options, selected, onChange, formatLabel }
   );
 }
 
+// ─── SortPanel ──────────────────────────────────────────────────────
+// Pembangun urutan bertingkat ala Excel: tambah beberapa tingkat,
+// pilih kolom & arah tiap tingkat, ubah prioritas, atau reset.
+function SortPanel({ fields, sortKeys, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const usedCols = sortKeys.map(k => k.col);
+  const firstUnused = fields.find(f => !usedCols.includes(f.col));
+
+  const setLevel = (i, patch) => onChange(sortKeys.map((k, idx) => idx === i ? { ...k, ...patch } : k));
+  const removeLevel = (i) => onChange(sortKeys.filter((_, idx) => idx !== i));
+  const addLevel = () => firstUnused && onChange([...sortKeys, { col: firstUnused.col, dir: defaultDirFor(firstUnused.col) }]);
+  const move = (i, d) => {
+    const j = i + d;
+    if (j < 0 || j >= sortKeys.length) return;
+    const next = [...sortKeys];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+
+  return (
+    <div className="msd-wrap" ref={ref}>
+      <div
+        className={`msd-trigger ${open ? 'open' : ''} ${sortKeys.length > 1 ? 'has-selection' : ''}`}
+        onClick={() => setOpen(v => !v)}
+      >
+        <span className="msd-label">Urutan bertingkat</span>
+        {sortKeys.length > 1 && <span className="msd-badge">{sortKeys.length}</span>}
+        <span className="msd-arrow">▾</span>
+      </div>
+
+      {open && (
+        <div className="msd-menu sort-panel">
+          {sortKeys.map((k, i) => {
+            const field = fields.find(f => f.col === k.col) || {};
+            const opts = fields.filter(f => f.col === k.col || !usedCols.includes(f.col));
+            return (
+              <div className="sort-level" key={`${k.col}-${i}`}>
+                <span className="sort-level-tag">{i === 0 ? 'Urut' : 'lalu'}</span>
+                <select
+                  className="sort-select"
+                  value={k.col}
+                  onChange={e => setLevel(i, { col: e.target.value, dir: defaultDirFor(e.target.value) })}
+                >
+                  {opts.map(f => <option key={f.col} value={f.col}>{f.label}</option>)}
+                </select>
+                <button className="sort-dir-btn" onClick={() => setLevel(i, { dir: k.dir === 'asc' ? 'desc' : 'asc' })}>
+                  {field.numeric ? (k.dir === 'asc' ? '0–9' : '9–0') : (k.dir === 'asc' ? 'A–Z' : 'Z–A')}
+                </button>
+                <div className="sort-level-actions">
+                  <button onClick={() => move(i, -1)} disabled={i === 0} title="Naikkan prioritas">↑</button>
+                  <button onClick={() => move(i, 1)} disabled={i === sortKeys.length - 1} title="Turunkan prioritas">↓</button>
+                  <button onClick={() => removeLevel(i)} disabled={sortKeys.length === 1} title="Hapus tingkat">✕</button>
+                </div>
+              </div>
+            );
+          })}
+          <div className="sort-panel-actions">
+            <button className="msd-action-btn" onClick={addLevel} disabled={!firstUnused}>+ Tambah tingkat</button>
+            <button className="msd-action-btn" onClick={() => onChange(DEFAULT_SORT)}>Reset</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Pagination ─────────────────────────────────────────────────────
 function Pagination({ page, totalPages, onPage }) {
   if (totalPages <= 1) return null;
@@ -831,7 +1001,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState(null);
-  const [sort, setSort] = useState("desc");
+  const [sortKeys, setSortKeys] = useState(DEFAULT_SORT);
   const [showGuidance, setShowGuidance] = useState(true);
 
   const [suggestions, setSuggestions] = useState([]);
@@ -915,7 +1085,7 @@ export default function App() {
   }, [selectedRS]); // eslint-disable-line react-hooks/exhaustive-deps
   // ─────────────────────────────────────────────────────────────────
 
-  function buildParams(q, kat, rs, thn, kls, pg = 1, sortOrder = 'desc') {
+  function buildParams(q, kat, rs, thn, kls, pg = 1, keys = DEFAULT_SORT) {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     kat.forEach(k => params.append('kategori', k));
@@ -923,7 +1093,7 @@ export default function App() {
     thn.forEach(t => params.append('tahun', t));
     kls.forEach(c => params.append('kelas_kamar', c));
     params.set('page', pg);
-    params.set('sort', sortOrder);
+    params.set('sort', serializeSort(keys));
     return params.toString();
   }
 
@@ -957,11 +1127,13 @@ export default function App() {
     setError(null);
     setPage(pg);
 
-    const activeSort = overrideSort ?? (pg === 1 ? 'desc' : sort);
-    if (pg === 1 && overrideSort === undefined) setSort('desc');
+    // Pencarian baru (halaman 1 tanpa override) → reset ke urutan default
+    const fresh = pg === 1 && overrideSort === undefined;
+    const keys = overrideSort ?? (fresh ? DEFAULT_SORT : sortKeys);
+    if (fresh) setSortKeys(DEFAULT_SORT);
 
     try {
-      const p = buildParams(q, selectedKategori, selectedRS, selectedTahun, selectedKelas, pg, activeSort);
+      const p = buildParams(q, selectedKategori, selectedRS, selectedTahun, selectedKelas, pg, keys);
       const res = await fetch(`${API}/search?${p}`);
       const data = await res.json();
       setResults(data.data);
@@ -976,12 +1148,30 @@ export default function App() {
     scrollToTop();
   };
 
-  const handleSortChange = (newSort) => {
-    setSort(newSort);
-    handleSearch(query, 1, newSort);
+  // Terapkan daftar urutan baru lalu muat ulang dari halaman 1.
+  // Daftar kosong jatuh kembali ke urutan default.
+  const applySortKeys = (keys) => {
+    const next = keys.length ? keys : DEFAULT_SORT;
+    setSortKeys(next);
+    handleSearch(query, 1, next);
   };
 
-  const goToPage = (pg) => handleSearch(query, pg, sort);
+  // Klik header: jadikan kolom ini satu-satunya kunci (toggle arah bila sudah
+  // jadi kunci tunggal). Shift+klik: tambah/ubah kolom sebagai tingkat baru.
+  const handleHeaderSort = (col, additive) => {
+    const idx = sortKeys.findIndex(k => k.col === col);
+    if (additive) {
+      if (idx === -1) return applySortKeys([...sortKeys, { col, dir: defaultDirFor(col) }]);
+      const next = sortKeys.map((k, i) => i === idx ? { ...k, dir: k.dir === 'asc' ? 'desc' : 'asc' } : k);
+      return applySortKeys(next);
+    }
+    const dir = sortKeys.length === 1 && idx === 0
+      ? (sortKeys[0].dir === 'asc' ? 'desc' : 'asc')
+      : defaultDirFor(col);
+    applySortKeys([{ col, dir }]);
+  };
+
+  const goToPage = (pg) => handleSearch(query, pg, sortKeys);
 
   const handleSuggClick = (nama) => {
     setQuery(nama);
@@ -995,7 +1185,7 @@ export default function App() {
     setSearched(false); setSuggestions([]);
     setShowSugg(false); setError(null);
     setPage(1); setTotal(0); setTotalPages(0);
-    setSort("desc");
+    setSortKeys(DEFAULT_SORT);
     inputRef.current?.focus();
   };
 
@@ -1014,6 +1204,8 @@ export default function App() {
   };
 
   const showRS = filters.rumah_sakit?.length > 0;
+  // Kolom Rumah Sakit hanya relevan saat datanya multi-RS
+  const sortFields = SORT_FIELDS.filter(f => f.col !== 'rumah_sakit' || showRS);
 
   return (
     <>
@@ -1139,7 +1331,7 @@ export default function App() {
 
           {searched && (
             <>
-              {!loading && results.length > 0 && (
+              {results.length > 0 && (
                 <div className="results-meta">
                   <div className="results-count">
                     Menampilkan <span>{(page - 1) * 50 + 1}–{(page - 1) * 50 + results.length}</span> dari <span>{total}</span> hasil
@@ -1147,12 +1339,19 @@ export default function App() {
                   </div>
                   <div className="sort-group">
                     Urutkan harga:
-                    <button className={`sort-btn ${sort === 'desc' ? 'active' : ''}`} onClick={() => handleSortChange('desc')}>
+                    <button
+                      className={`sort-btn ${sortKeys.length === 1 && sortKeys[0].col === 'tarif' && sortKeys[0].dir === 'desc' ? 'active' : ''}`}
+                      onClick={() => applySortKeys([{ col: 'tarif', dir: 'desc' }])}
+                    >
                       Termahal ↓
                     </button>
-                    <button className={`sort-btn ${sort === 'asc' ? 'active' : ''}`} onClick={() => handleSortChange('asc')}>
+                    <button
+                      className={`sort-btn ${sortKeys.length === 1 && sortKeys[0].col === 'tarif' && sortKeys[0].dir === 'asc' ? 'active' : ''}`}
+                      onClick={() => applySortKeys([{ col: 'tarif', dir: 'asc' }])}
+                    >
                       Termurah ↑
                     </button>
+                    <SortPanel fields={sortFields} sortKeys={sortKeys} onChange={applySortKeys} />
                   </div>
                 </div>
               )}
@@ -1161,20 +1360,19 @@ export default function App() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Tahun</th>
-                      {showRS && <th>Rumah Sakit</th>}
-                      <th>Kategori</th>
-                      <th>Nama Layanan</th>
-                      <th>Kelas Kamar</th>
-                      <th className="right">Tarif</th>
-                      <th className="right">
-                        % vs Last Year
+                      <SortableTh col="tahun" label="Tahun" sortKeys={sortKeys} onSort={handleHeaderSort} />
+                      {showRS && <SortableTh col="rumah_sakit" label="Rumah Sakit" sortKeys={sortKeys} onSort={handleHeaderSort} />}
+                      <SortableTh col="kategori_harga" label="Kategori" sortKeys={sortKeys} onSort={handleHeaderSort} />
+                      <SortableTh col="nama_layanan" label="Nama Layanan" sortKeys={sortKeys} onSort={handleHeaderSort} />
+                      <SortableTh col="kelas_kamar" label="Kelas Kamar" sortKeys={sortKeys} onSort={handleHeaderSort} />
+                      <SortableTh col="tarif" label="Tarif" align="right" sortKeys={sortKeys} onSort={handleHeaderSort} />
+                      <SortableTh col="pct_increase" label="% vs Last Year" align="right" sortKeys={sortKeys} onSort={handleHeaderSort}>
                         <InfoTip label="Informasi kolom kenaikan harga">
                           Perubahan harga dibandingkan tahun sebelumnya.
                           Tanda “—” berarti tidak ada data tahun lalu untuk item yang sama
                           dengan kelas kamar dan kategori harga yang sama.
                         </InfoTip>
-                      </th>
+                      </SortableTh>
                     </tr>
                   </thead>
                   <tbody>

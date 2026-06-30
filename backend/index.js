@@ -15,6 +15,42 @@ function parseMulti(val) {
   return val.split(',').map(v => v.trim()).filter(Boolean);
 }
 
+// Whitelist kolom yang boleh dipakai untuk ORDER BY (cegah SQL injection —
+// nilai dari client TIDAK PERNAH di-interpolasi langsung ke SQL)
+const SORT_COLUMNS = {
+  tahun: 't.tahun',
+  rumah_sakit: 't.rumah_sakit',
+  kategori_harga: 't.kategori_harga',
+  nama_layanan: 't.nama_layanan',
+  kelas_kamar: 't.kelas_kamar',
+  tarif: 't.tarif',
+  pct_increase: 'pct_increase',
+};
+
+// Bangun klausa ORDER BY dari daftar urutan bertingkat: "col:dir,col:dir,...".
+// Hanya kolom dalam whitelist yang dipakai; kolom duplikat diabaikan. Tiebreaker
+// default (nama layanan, lalu tarif) selalu ditambahkan di akhir agar urutan stabil.
+function buildOrderBy(sortParam) {
+  const parts = [];
+  const used = new Set();
+
+  for (const token of String(sortParam || '').split(',')) {
+    const [rawCol, rawDir] = token.split(':');
+    const col = SORT_COLUMNS[(rawCol || '').trim()];
+    if (!col || used.has(col)) continue;
+    const dir = (rawDir || '').trim().toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    parts.push(`${col} ${dir} NULLS LAST`);
+    used.add(col);
+  }
+
+  // Tiebreaker default: kelompokkan per nama layanan, lalu tarif tertinggi dulu
+  for (const [tbCol, tbDir] of [['t.nama_layanan', 'ASC'], ['t.tarif', 'DESC']]) {
+    if (!used.has(tbCol)) { parts.push(`${tbCol} ${tbDir}`); used.add(tbCol); }
+  }
+
+  return `ORDER BY ${parts.join(', ')}`;
+}
+
 // GET /filters — semua distinct values untuk dropdown + relasi kategori↔rumah_sakit + relasi kelas_kamar↔rumah_sakit
 app.get('/filters', async (req, res) => {
   try {
@@ -88,7 +124,7 @@ app.get('/search', async (req, res) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const sortDir = req.query.sort === 'asc' ? 'ASC' : 'DESC';
+    const orderBy = buildOrderBy(req.query.sort);
 
     // Jalanin query data + count paralel
     const [result, countResult] = await Promise.all([
@@ -106,7 +142,7 @@ app.get('/search', async (req, res) => {
                AND t.kelas_kamar IS NOT DISTINCT FROM p.kelas_kamar
                AND p.tahun = 2025
          ${where}
-         ORDER BY t.nama_layanan ASC, t.tarif ${sortDir}
+         ${orderBy}
          LIMIT $${i} OFFSET $${i + 1}`,
         [...params, PAGE_SIZE, offset]
       ),
