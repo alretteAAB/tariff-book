@@ -962,10 +962,10 @@ function MultiSelectDropdown({ label, options, selected, onChange, formatLabel }
             </div>
           )}
           <div className="msd-actions">
-            <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange([...options]); }}>
+            <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange([...new Set([...selected, ...filtered])]); }}>
               Pilih Semua
             </button>
-            <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange([]); }}>
+            <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange(selected.filter(v => !filtered.includes(v))); }}>
               Hapus Semua
             </button>
           </div>
