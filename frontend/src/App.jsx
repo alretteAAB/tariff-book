@@ -345,6 +345,30 @@ const styles = `
     overflow: hidden;
     background: var(--surface);
   }
+  .active-filters-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
+    padding: 7px 10px;
+    background: var(--card-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .active-filters.collapsed .active-filters-header { border-bottom: none; }
+  .active-filters-title {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--gold);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .active-filters-toggle {
+    display: flex; align-items: center; gap: 5px;
+    background: none; border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 3px 9px;
+    font-family: var(--font-body); font-size: 11px; font-weight: 600;
+    color: var(--text-muted); cursor: pointer;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .active-filters-toggle:hover { border-color: var(--gold); color: var(--gold); }
   .filter-group-row {
     display: grid;
     grid-template-columns: 130px 1fr auto;
@@ -1212,6 +1236,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [sortKeys, setSortKeys] = useState(DEFAULT_SORT);
   const [showGuidance, setShowGuidance] = useState(true);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [view, setView] = useState("list"); // 'list' | 'compare'
   // Param pencarian yang sudah "dikomit" (dipakai untuk ekspor & banding,
   // agar konsisten dengan hasil yang tampil — bukan kontrol live)
@@ -1454,8 +1479,86 @@ export default function App() {
 
         <main className="main">
           <div className="search-card">
-            <div className="search-label">Pencarian Tarif</div>
-            <div className="search-row">
+            <div className="search-label">Filter</div>
+            <div className="filter-row">
+              <MultiSelectDropdown
+                label="Tahun"
+                options={filters.tahun || []}
+                selected={selectedTahun}
+                onChange={setSelectedTahun}
+                formatLabel={v => String(v)}
+              />
+              {showRS && (
+                <MultiSelectDropdown
+                  label="Rumah Sakit"
+                  options={availableRS}
+                  selected={selectedRS}
+                  onChange={setSelectedRS}
+                />
+              )}
+              <MultiSelectDropdown
+                label="Kategori"
+                options={availableKategori}
+                selected={selectedKategori}
+                onChange={setSelectedKategori}
+              />
+              <MultiSelectDropdown
+                label="Kelas Kamar"
+                options={availableKelas}
+                selected={selectedKelas}
+                onChange={setSelectedKelas}
+              />
+            </div>
+
+            {showGuidance && (
+              <div className="filter-guidance">
+                <div className="filter-guidance-text">
+                  <p>⚠️ Sangat disarankan: pilih filter dulu sebelum mencari</p>
+                  <p>Pilih Tahun → Rumah Sakit → Kategori → Kelas Kamar — hasil & saran pencarian akan lebih akurat dan relevan</p>
+                </div>
+                <button className="filter-guidance-close" onClick={() => setShowGuidance(false)}>×</button>
+              </div>
+            )}
+
+            {filterGroups.length > 0 && (
+              <div className={`active-filters ${filtersCollapsed ? 'collapsed' : ''}`}>
+                <div className="active-filters-header">
+                  <span className="active-filters-title">
+                    Filter Aktif
+                    <span className="msd-badge">{filterGroups.reduce((n, g) => n + g.values.length, 0)}</span>
+                  </span>
+                  <button
+                    className="active-filters-toggle"
+                    onClick={() => setFiltersCollapsed(v => !v)}
+                    title={filtersCollapsed ? 'Perbesar' : 'Perkecil'}
+                  >
+                    {filtersCollapsed ? '⤢ Maximize' : '⤡ Minimize'}
+                  </button>
+                </div>
+                {!filtersCollapsed && filterGroups.map((group) => (
+                  <div key={group.type} className="filter-group-row">
+                    <div className="filter-group-name">{group.label}</div>
+                    <div className="filter-group-values">
+                      {group.values.map((val) => (
+                        <span key={String(val)} className="filter-chip">
+                          {group.fmt(val)}
+                          <button className="chip-remove" onClick={() => removeChip({ type: group.type, val })}>✕</button>
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      className="filter-group-clear"
+                      onClick={() => clearGroup(group.type)}
+                      title={`Hapus semua ${group.label}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="search-row" style={{ marginTop: 14 }}>
               <div className="input-wrap" style={{ position: 'relative' }}>
                 <span className="input-icon">🔍</span>
                 <input
@@ -1492,71 +1595,6 @@ export default function App() {
                 {loading ? "Mencari..." : "Cari"}
               </button>
             </div>
-
-            <div className="filter-row">
-              <MultiSelectDropdown
-                label="Tahun"
-                options={filters.tahun || []}
-                selected={selectedTahun}
-                onChange={setSelectedTahun}
-                formatLabel={v => String(v)}
-              />
-              {showRS && (
-                <MultiSelectDropdown
-                  label="Rumah Sakit"
-                  options={availableRS}
-                  selected={selectedRS}
-                  onChange={setSelectedRS}
-                />
-              )}
-              <MultiSelectDropdown
-                label="Kategori"
-                options={availableKategori}
-                selected={selectedKategori}
-                onChange={setSelectedKategori}
-              />
-              <MultiSelectDropdown
-                label="Kelas Kamar"
-                options={availableKelas}
-                selected={selectedKelas}
-                onChange={setSelectedKelas}
-              />
-            </div>
-
-            {showGuidance && (
-              <div className="filter-guidance">
-                <div className="filter-guidance-text">
-                  <p>💡 Gunakan filter dari kiri ke kanan untuk hasil terbaik</p>
-                  <p>Pilih Tahun → Rumah Sakit → Kategori → Kelas Kamar</p>
-                </div>
-                <button className="filter-guidance-close" onClick={() => setShowGuidance(false)}>×</button>
-              </div>
-            )}
-
-            {filterGroups.length > 0 && (
-              <div className="active-filters">
-                {filterGroups.map((group) => (
-                  <div key={group.type} className="filter-group-row">
-                    <div className="filter-group-name">{group.label}</div>
-                    <div className="filter-group-values">
-                      {group.values.map((val) => (
-                        <span key={String(val)} className="filter-chip">
-                          {group.fmt(val)}
-                          <button className="chip-remove" onClick={() => removeChip({ type: group.type, val })}>✕</button>
-                        </span>
-                      ))}
-                    </div>
-                    <button
-                      className="filter-group-clear"
-                      onClick={() => clearGroup(group.type)}
-                      title={`Hapus semua ${group.label}`}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {error && (
