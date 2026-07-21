@@ -618,6 +618,7 @@ const styles = `
     color: var(--text-muted); white-space: nowrap;
   }
   .td-rs { font-size: 11px; color: var(--text-muted); }
+  .td-kelompok { font-size: 11px; color: var(--text-muted); }
   .td-tahun {
     font-size: 13px; font-weight: 400;
     color: var(--text-muted);
@@ -828,6 +829,7 @@ function formatRupiah(num) {
 // `numeric` menentukan arah default saat kolom pertama kali dipilih.
 const SORT_FIELDS = [
   { col: 'tahun', label: 'Tahun', numeric: true },
+  { col: 'kelompok', label: 'Kelompok' },
   { col: 'rumah_sakit', label: 'Rumah Sakit' },
   { col: 'kategori_harga', label: 'Kategori' },
   { col: 'nama_layanan', label: 'Nama Layanan' },
@@ -1070,15 +1072,15 @@ function SortPanel({ fields, sortKeys, onChange }) {
 // ─── CompareView ────────────────────────────────────────────────────
 // Matriks perbandingan tarif: baris = layanan (+ dimensi tetap), kolom =
 // nilai sumbu terpilih. Sel termurah/termahal per baris disorot.
-function fixedLabel(fixed, hideRS) {
+function fixedLabel(fixed, hideRS, rsLabel) {
   const order = ['rumah_sakit', 'tahun', 'kelas_kamar'];
   return order
     .filter(k => fixed[k] != null && fixed[k] !== '' && !(hideRS && k === 'rumah_sakit'))
-    .map(k => (k === 'kelas_kamar' ? `Kelas ${fixed[k]}` : String(fixed[k])))
+    .map(k => (k === 'kelas_kamar' ? `Kelas ${fixed[k]}` : k === 'rumah_sakit' ? rsLabel(fixed[k]) : String(fixed[k])))
     .join(' · ');
 }
 
-function CompareView({ apiParams, axes, showRS }) {
+function CompareView({ apiParams, axes, showRS, rsLabel }) {
   const [axis, setAxis] = useState(axes[0]?.key || 'tahun');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1132,7 +1134,7 @@ function CompareView({ apiParams, axes, showRS }) {
               <tr>
                 <th className="pivot-corner">Layanan</th>
                 {columns.map(c => (
-                  <th key={c} className="right">{axis === 'kelas_kamar' ? `Kelas ${c}` : c}</th>
+                  <th key={c} className="right">{axis === 'kelas_kamar' ? `Kelas ${c}` : axis === 'rumah_sakit' ? rsLabel(c) : c}</th>
                 ))}
               </tr>
             </thead>
@@ -1158,7 +1160,7 @@ function CompareView({ apiParams, axes, showRS }) {
                       <div className="pivot-name">{row.nama_layanan}</div>
                       <div className="pivot-sub">
                         {row.kategori_harga.replace('TARIF ', '')}
-                        {fixedLabel(row.fixed, !showRS) && <> · {fixedLabel(row.fixed, !showRS)}</>}
+                        {fixedLabel(row.fixed, !showRS, rsLabel) && <> · {fixedLabel(row.fixed, !showRS, rsLabel)}</>}
                       </div>
                     </td>
                     {columns.map(c => {
@@ -1222,7 +1224,7 @@ function Pagination({ page, totalPages, onPage }) {
 // ─── Main App ───────────────────────────────────────────────────────
 export default function App() {
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState({ kategori: [], rumah_sakit: [], tahun: [], kelas_kamar: [], relations: [], kelas_relations: [] });
+  const [filters, setFilters] = useState({ kategori: [], rumah_sakit: [], tahun: [], kelas_kamar: [], relations: [], kelas_relations: [], rumah_sakit_info: [] });
   const [selectedKategori, setSelectedKategori] = useState([]);
   const [selectedRS, setSelectedRS] = useState([]);
   const [selectedTahun, setSelectedTahun] = useState([]);
@@ -1291,6 +1293,10 @@ export default function App() {
   // Rumah Sakit selalu menampilkan semua opsi — pilihan Kategori/Kelas Kamar
   // TIDAK menghilangkan kandidat Rumah Sakit (dependensi satu arah saja).
   const availableRS = filters.rumah_sakit;
+
+  // Peta kode rumah_sakit -> nama tampilan, dipakai di dropdown/chip/compare
+  const rsInfoMap = Object.fromEntries((filters.rumah_sakit_info || []).map(i => [i.rumah_sakit, i]));
+  const rsLabel = (code) => rsInfoMap[code]?.display_name || code;
 
   const availableKategori = selectedRS.length > 0
     ? filters.kategori.filter(k =>
@@ -1436,7 +1442,7 @@ export default function App() {
   // Filter aktif dikelompokkan per kategori (ditampilkan sebagai tabel ringkas)
   const filterGroups = [
     { type: 'tahun', label: 'Tahun', values: selectedTahun, fmt: t => String(t) },
-    { type: 'rs', label: 'Rumah Sakit', values: selectedRS, fmt: r => r },
+    { type: 'rs', label: 'Rumah Sakit', values: selectedRS, fmt: r => rsLabel(r) },
     { type: 'kategori', label: 'Kategori', values: selectedKategori, fmt: k => k.replace('TARIF ', '') },
     { type: 'kelas', label: 'Kelas Kamar', values: selectedKelas, fmt: c => String(c) },
   ].filter(g => g.values.length > 0);
@@ -1456,8 +1462,8 @@ export default function App() {
   };
 
   const showRS = filters.rumah_sakit?.length > 0;
-  // Kolom Rumah Sakit hanya relevan saat datanya multi-RS
-  const sortFields = SORT_FIELDS.filter(f => f.col !== 'rumah_sakit' || showRS);
+  // Kolom Rumah Sakit/Kelompok hanya relevan saat datanya multi-RS
+  const sortFields = SORT_FIELDS.filter(f => (f.col !== 'rumah_sakit' && f.col !== 'kelompok') || showRS);
   // Sumbu perbandingan yang tersedia (RS hanya bila multi-RS)
   const compareAxes = [
     ...(showRS ? [{ key: 'rumah_sakit', label: 'Rumah Sakit' }] : []),
@@ -1494,6 +1500,7 @@ export default function App() {
                   options={availableRS}
                   selected={selectedRS}
                   onChange={setSelectedRS}
+                  formatLabel={rsLabel}
                 />
               )}
               <MultiSelectDropdown
@@ -1624,7 +1631,7 @@ export default function App() {
               )} */}
 
               {view === 'compare' && results.length > 0 ? (
-                <CompareView apiParams={committedParams} axes={compareAxes} showRS={showRS} />
+                <CompareView apiParams={committedParams} axes={compareAxes} showRS={showRS} rsLabel={rsLabel} />
               ) : (
               <>
               {results.length > 0 && (
@@ -1664,6 +1671,7 @@ export default function App() {
                   <thead>
                     <tr>
                       <SortableTh col="tahun" label="Tahun" sortKeys={sortKeys} onSort={handleHeaderSort} />
+                      {showRS && <SortableTh col="kelompok" label="Kelompok" sortKeys={sortKeys} onSort={handleHeaderSort} />}
                       {showRS && <SortableTh col="rumah_sakit" label="Rumah Sakit" sortKeys={sortKeys} onSort={handleHeaderSort} />}
                       <SortableTh col="kategori_harga" label="Kategori" sortKeys={sortKeys} onSort={handleHeaderSort} />
                       <SortableTh col="nama_layanan" label="Nama Layanan" sortKeys={sortKeys} onSort={handleHeaderSort} />
@@ -1681,12 +1689,12 @@ export default function App() {
                   <tbody>
                     {loading && (
                       <tr className="loading-row">
-                        <td colSpan={showRS ? 7 : 6}><div className="spinner" /></td>
+                        <td colSpan={showRS ? 8 : 6}><div className="spinner" /></td>
                       </tr>
                     )}
                     {!loading && results.length === 0 && (
                       <tr>
-                        <td colSpan={showRS ? 7 : 6} style={{ padding: '52px', textAlign: 'center' }}>
+                        <td colSpan={showRS ? 8 : 6} style={{ padding: '52px', textAlign: 'center' }}>
                           <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.5 }}>🔍</div>
                           <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>
                             Tidak ada hasil
@@ -1700,7 +1708,8 @@ export default function App() {
                     {!loading && results.map((r, i) => (
                       <tr key={`${r.nama_layanan}-${r.rumah_sakit}-${r.tahun}-${r.kelas_kamar}-${r.tarif}-${i}`}>
                         <td><span className="td-tahun">{r.tahun}</span></td>
-                        {showRS && <td><span className="td-rs">{r.rumah_sakit}</span></td>}
+                        {showRS && <td><span className="td-kelompok">{r.kelompok || '—'}</span></td>}
+                        {showRS && <td><span className="td-rs">{r.rumah_sakit_display}</span></td>}
                         <td><span className="td-kategori">{r.kategori_harga.replace('TARIF ', '')}</span></td>
                         <td><span className="td-layanan">{highlight(r.nama_layanan, query)}</span></td>
                         <td><span className="td-kelas">{r.kelas_kamar}</span></td>
