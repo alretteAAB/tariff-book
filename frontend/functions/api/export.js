@@ -2,13 +2,12 @@ import { getClient, parseMulti, json } from './_supabase.js';
 
 // PORT VERBATIM from backend/index.js (unchanged — pure formatting):
 //   EXPORT_HEADERS, exportRow(), csvCell(), escapeXml(), buildSpreadsheetML()
-const EXPORT_HEADERS = ['Tahun', 'Kelompok', 'Rumah Sakit', 'Kategori', 'Nama Layanan', 'Kelas Kamar', 'Tarif', '% vs Tahun Lalu'];
+const EXPORT_HEADERS = ['Tahun', 'Rumah Sakit', 'Kategori', 'Nama Layanan', 'Kelas Kamar', 'Tarif', '% vs Tahun Lalu'];
 
 function exportRow(r) {
   return [
     r.tahun,
-    r.kelompok,
-    r.rumah_sakit_display,
+    r.rumah_sakit,
     (r.kategori_harga || '').replace('TARIF ', ''),
     r.nama_layanan,
     r.kelas_kamar,
@@ -50,8 +49,7 @@ function buildSpreadsheetML(rows) {
     const pct = r.pct_increase != null ? r.pct_increase / 100 : null;
     return '<Row>' + [
       numCell(r.tahun),
-      strCell(r.kelompok),
-      strCell(r.rumah_sakit_display),
+      strCell(r.rumah_sakit),
       strCell((r.kategori_harga || '').replace('TARIF ', '')),
       strCell(r.nama_layanan),
       strCell(r.kelas_kamar),
