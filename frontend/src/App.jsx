@@ -1340,6 +1340,15 @@ export default function App() {
     }, 250);
   }, [selectedKategori, selectedRS, selectedTahun, selectedKelas]);
 
+  // Bila filter diubah saat daftar saran sedang terbuka, muat ulang saran agar
+  // mengikuti filter terbaru (tanpa ini, daftar lama sebelum filter tetap tampil
+  // sampai pengguna mengetik lagi). Hanya berlaku saat dropdown sedang terbuka,
+  // jadi tidak memunculkan saran setelah pencarian dikomit.
+  useEffect(() => {
+    if (query.trim() && showSugg) fetchSuggestions(query);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKategori, selectedRS, selectedTahun, selectedKelas]);
+
   const handleQueryChange = (e) => {
     const val = e.target.value;
     setQuery(val);
