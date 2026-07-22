@@ -131,8 +131,8 @@ begin
     used  := used  || col_sql;
   end loop;
   -- stable tiebreakers
-  if not ('t.nama_layanan' = any(used)) then parts := parts || 't.nama_layanan asc';  end if;
-  if not ('t.tarif'        = any(used)) then parts := parts || 't.tarif desc';         end if;
+  if not ('t.nama_layanan' = any(used)) then parts := parts || 't.nama_layanan asc'::text;  end if;
+  if not ('t.tarif'        = any(used)) then parts := parts || 't.tarif desc'::text;         end if;
   return array_to_string(parts, ', ');
 end $$;
 
@@ -171,7 +171,8 @@ begin
      and t.kelas_kamar is not distinct from p.kelas_kamar
      and p.tahun = 2025
     where ($1 is null or (t.nama_layanan ilike '%' || esc_like($1) || '%'
-                          or $1 <% t.nama_layanan))
+                          or $1 <% t.nama_layanan
+                          or t.kategori_harga ilike '%' || esc_like($1) || '%'))
       and ($2 is null or t.kategori_harga = any($2))
       and ($3 is null or t.rumah_sakit    = any($3))
       and ($4 is null or t.tahun          = any($4))

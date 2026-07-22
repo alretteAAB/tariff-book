@@ -604,6 +604,10 @@ const styles = `
     color: var(--text-muted); text-transform: uppercase;
     letter-spacing: 0.8px;
   }
+  .td-kategori mark {
+    background: rgba(138,96,16,0.12); color: var(--gold);
+    border-radius: 2px; padding: 0 2px; font-weight: 700;
+  }
   .td-layanan { font-weight: 500; color: var(--text); }
   .td-layanan mark {
     background: rgba(138,96,16,0.12); color: var(--gold);
@@ -1710,7 +1714,7 @@ export default function App() {
                       <tr key={`${r.nama_layanan}-${r.rumah_sakit}-${r.tahun}-${r.kelas_kamar}-${r.tarif}-${i}`}>
                         <td><span className="td-tahun">{r.tahun}</span></td>
                         {showRS && <td><span className="td-rs">{r.rumah_sakit}</span></td>}
-                        <td><span className="td-kategori">{r.kategori_harga.replace('TARIF ', '')}</span></td>
+                        <td><span className="td-kategori">{highlight(r.kategori_harga.replace('TARIF ', ''), query)}</span></td>
                         <td><span className="td-layanan">{highlight(r.nama_layanan, query)}</span></td>
                         <td><span className="td-kelas">{r.kelas_kamar}</span></td>
                         <td style={{ textAlign: 'right' }}><span className="td-tarif">{formatRupiah(r.tarif)}</span></td>
