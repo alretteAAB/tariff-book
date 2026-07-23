@@ -832,6 +832,7 @@ function formatRupiah(num) {
 // `numeric` menentukan arah default saat kolom pertama kali dipilih.
 const SORT_FIELDS = [
   { col: 'tahun', label: 'Tahun', numeric: true },
+  { col: 'nama_group', label: 'Grup RS' },
   { col: 'rumah_sakit', label: 'Rumah Sakit' },
   { col: 'kategori_harga', label: 'Kategori' },
   { col: 'nama_layanan', label: 'Nama Layanan' },
@@ -1470,7 +1471,7 @@ export default function App() {
 
   const showRS = filters.rumah_sakit?.length > 0;
   // Kolom Rumah Sakit hanya relevan saat datanya multi-RS
-  const sortFields = SORT_FIELDS.filter(f => f.col !== 'rumah_sakit' || showRS);
+  const sortFields = SORT_FIELDS.filter(f => (f.col !== 'rumah_sakit' && f.col !== 'nama_group') || showRS);
   // Sumbu perbandingan yang tersedia (RS hanya bila multi-RS)
   const compareAxes = [
     ...(showRS ? [{ key: 'rumah_sakit', label: 'Rumah Sakit' }] : []),
@@ -1677,6 +1678,7 @@ export default function App() {
                   <thead>
                     <tr>
                       <SortableTh col="tahun" label="Tahun" sortKeys={sortKeys} onSort={handleHeaderSort} />
+                      {showRS && <SortableTh col="nama_group" label="Grup RS" sortKeys={sortKeys} onSort={handleHeaderSort} />}
                       {showRS && <SortableTh col="rumah_sakit" label="Rumah Sakit" sortKeys={sortKeys} onSort={handleHeaderSort} />}
                       <SortableTh col="kategori_harga" label="Kategori" sortKeys={sortKeys} onSort={handleHeaderSort} />
                       <SortableTh col="nama_layanan" label="Nama Layanan" sortKeys={sortKeys} onSort={handleHeaderSort} />
@@ -1694,12 +1696,12 @@ export default function App() {
                   <tbody>
                     {loading && (
                       <tr className="loading-row">
-                        <td colSpan={showRS ? 7 : 6}><div className="spinner" /></td>
+                        <td colSpan={showRS ? 8 : 6}><div className="spinner" /></td>
                       </tr>
                     )}
                     {!loading && results.length === 0 && (
                       <tr>
-                        <td colSpan={showRS ? 7 : 6} style={{ padding: '52px', textAlign: 'center' }}>
+                        <td colSpan={showRS ? 8 : 6} style={{ padding: '52px', textAlign: 'center' }}>
                           <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.5 }}>🔍</div>
                           <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>
                             Tidak ada hasil
@@ -1713,6 +1715,7 @@ export default function App() {
                     {!loading && results.map((r, i) => (
                       <tr key={`${r.nama_layanan}-${r.rumah_sakit}-${r.tahun}-${r.kelas_kamar}-${r.tarif}-${i}`}>
                         <td><span className="td-tahun">{r.tahun}</span></td>
+                        {showRS && <td><span className="td-rs">{r.nama_group || '—'}</span></td>}
                         {showRS && <td><span className="td-rs">{r.rumah_sakit}</span></td>}
                         <td><span className="td-kategori">{highlight(r.kategori_harga.replace('TARIF ', ''), query)}</span></td>
                         <td><span className="td-layanan">{highlight(r.nama_layanan, query)}</span></td>
