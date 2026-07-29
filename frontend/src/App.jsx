@@ -1286,6 +1286,7 @@ const golRank = (g) => {
   return i === -1 ? GOL_ORDER.length : i;
 };
 
+const GOL_RUMAH_SAKIT = [...new Set(golonganData.map(r => r.rumah_sakit))].sort((a, b) => a.localeCompare(b, 'id'));
 const GOL_SPECIALTIES = [...new Set(golonganData.map(r => r.specialty))].sort((a, b) => a.localeCompare(b, 'id'));
 const GOL_GOLONGAN = [...new Set(golonganData.map(r => r.golongan))].sort((a, b) => golRank(a) - golRank(b));
 
@@ -1304,6 +1305,7 @@ const GOL_PAGE_SIZE = 50;
 
 function GolonganView() {
   const [query, setQuery] = useState("");
+  const [selRS, setSelRS] = useState([]);
   const [selSpec, setSelSpec] = useState([]);
   const [selGol, setSelGol] = useState([]);
   const [sortKeys, setSortKeys] = useState(GOL_DEFAULT_SORT);
@@ -1313,6 +1315,7 @@ function GolonganView() {
     const q = query.trim().toLowerCase();
     const filtered = golonganData.filter(r =>
       (!q || r.nama_layanan.toLowerCase().includes(q) || r.specialty.toLowerCase().includes(q)) &&
+      (!selRS.length || selRS.includes(r.rumah_sakit)) &&
       (!selSpec.length || selSpec.includes(r.specialty)) &&
       (!selGol.length || selGol.includes(r.golongan))
     );
@@ -1326,7 +1329,7 @@ function GolonganView() {
       }
       return a.nama_layanan.localeCompare(b.nama_layanan, 'id');
     });
-  }, [query, selSpec, selGol, sortKeys]);
+  }, [query, selRS, selSpec, selGol, sortKeys]);
 
   const totalPages = Math.ceil(rows.length / GOL_PAGE_SIZE);
   // Dijepit saat render agar halaman tidak sempat "kosong" satu frame ketika
@@ -1335,7 +1338,7 @@ function GolonganView() {
   const pageRows = rows.slice((curPage - 1) * GOL_PAGE_SIZE, curPage * GOL_PAGE_SIZE);
 
   // Kembali ke halaman 1 setiap kali hasil berubah
-  useEffect(() => { setPage(1); }, [query, selSpec, selGol, sortKeys]);
+  useEffect(() => { setPage(1); }, [query, selRS, selSpec, selGol, sortKeys]);
 
   // Klik header: jadikan kolom ini kunci tunggal (toggle arah bila sudah tunggal).
   // Shift+klik: tambah sebagai tingkat urutan berikutnya.
@@ -1350,11 +1353,12 @@ function GolonganView() {
   };
 
   const handleClear = () => {
-    setQuery(""); setSelSpec([]); setSelGol([]);
+    setQuery(""); setSelRS([]); setSelSpec([]); setSelGol([]);
     setSortKeys(GOL_DEFAULT_SORT);
   };
 
   const activeGroups = [
+    { type: 'rs', label: 'Rumah Sakit', values: selRS, set: setSelRS },
     { type: 'spec', label: 'Spesialisasi', values: selSpec, set: setSelSpec },
     { type: 'gol', label: 'Golongan', values: selGol, set: setSelGol },
   ].filter(g => g.values.length > 0);
@@ -1364,6 +1368,12 @@ function GolonganView() {
       <div className="search-card">
         <div className="search-label">Filter</div>
         <div className="filter-row">
+          <MultiSelectDropdown
+            label="Rumah Sakit"
+            options={GOL_RUMAH_SAKIT}
+            selected={selRS}
+            onChange={setSelRS}
+          />
           <MultiSelectDropdown
             label="Spesialisasi"
             options={GOL_SPECIALTIES}
