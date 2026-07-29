@@ -10,13 +10,18 @@ import { SortableTh } from "../components/SortableTh.jsx";
 // ─── GolonganView ───────────────────────────────────────────────────
 // Tab kedua: referensi golongan tindakan operasi (rumah sakit · spesialisasi ·
 // golongan · nama layanan). Datanya statis dan ikut di-bundle
-// (src/data/golongan-operasi.json, dihasilkan dari data/golongan_operasi.csv),
-// jadi semua pencarian, filter, pengurutan, dan paginasi dilakukan di sisi
-// klien — tanpa panggilan API.
+// (src/data/golongan-operasi.json, gabungan dari berkas-berkas di data/), jadi
+// semua pencarian, filter, pengurutan, dan paginasi dilakukan di sisi klien —
+// tanpa panggilan API.
+//
+// Catatan data: buku Grand Wisata menulis golongan dengan awalan "OPERASI "
+// ("OPERASI KECIL"), Bekasi Timur tanpa awalan. Awalan itu dibuang saat data
+// dibuat agar keduanya jadi satu nilai di filter dan pengurutan.
 
-// Urutan golongan mengikuti tingkatannya, bukan abjad.
+// Urutan golongan mengikuti tingkatannya, bukan abjad. 'SEDANG' tanpa angka
+// hanya dipakai Grand Wisata, ditaruh sebelum tingkat SEDANG yang bernomor.
 const GOL_ORDER = [
-  'KECIL', 'SEDANG 1', 'SEDANG 2', 'SEDANG 3',
+  'KECIL', 'SEDANG', 'SEDANG 1', 'SEDANG 2', 'SEDANG 3',
   'BESAR 1', 'BESAR 2', 'BESAR 3',
   'KHUSUS 1', 'KHUSUS 2', 'KHUSUS 3',
 ];
