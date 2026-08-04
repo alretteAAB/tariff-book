@@ -204,6 +204,34 @@ export const styles = `
     margin-top: 10px;
   }
 
+  /* Tirai penutup baris filter selama /api/filters belum selesai.
+     Menutupi dropdown yang masih kosong sekaligus memblokir kliknya. */
+  .filter-zone { position: relative; }
+  .filter-overlay {
+    position: absolute; inset: -4px -6px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: rgba(253, 252, 249, 0.88);
+    backdrop-filter: blur(2px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 12px; color: var(--text-muted); letter-spacing: 0.2px;
+    animation: fadeIn 0.15s ease;
+  }
+  .filter-overlay .spinner { width: 15px; height: 15px; }
+  /* Lebar dipatok agar teks tidak bergeser saat jumlah titik berubah */
+  .loading-dots { display: inline-block; width: 1.5em; text-align: left; }
+  .filter-overlay-error { color: #c0392b; }
+  .filter-retry-btn {
+    font-family: var(--font-body); font-size: 11px;
+    padding: 4px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border-mid);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted); cursor: pointer; transition: all 0.12s;
+  }
+  .filter-retry-btn:hover { border-color: var(--gold); color: var(--gold); }
+
   /* ─── MULTI SELECT DROPDOWN ───────────────────────── */
   .msd-wrap { position: relative; }
   .msd-trigger {

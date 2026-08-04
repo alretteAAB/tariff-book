@@ -43,6 +43,9 @@ export default function TarifView() {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState(null);
   const [sortKeys, setSortKeys] = useState(DEFAULT_SORT);
+  const [filtersLoading, setFiltersLoading] = useState(true);
+  const [filtersError, setFiltersError] = useState(false);
+  const [dots, setDots] = useState(1);
   const [showGuidance, setShowGuidance] = useState(true);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [view, setView] = useState("list"); // 'list' | 'compare'
@@ -71,12 +74,30 @@ export default function TarifView() {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  useEffect(() => {
+  // Daftar isi dropdown datang dari /api/filters — payloadnya besar (~450 KB) dan
+  // bisa makan beberapa detik, jadi statusnya ditampilkan, bukan didiamkan.
+  const loadFilters = useCallback(() => {
+    setFiltersLoading(true);
+    setFiltersError(false);
     fetch(`${API}/filters`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(setFilters)
-      .catch(console.error);
+      .catch(err => { console.error(err); setFiltersError(true); })
+      .finally(() => setFiltersLoading(false));
   }, []);
+
+  useEffect(() => { loadFilters(); }, [loadFilters]);
+
+  // Titik berjalan: . → .. → ... → .... → ulang. Hanya hidup selama memuat.
+  useEffect(() => {
+    if (!filtersLoading) return;
+    setDots(1);
+    const id = setInterval(() => setDots(d => (d % 4) + 1), 350);
+    return () => clearInterval(id);
+  }, [filtersLoading]);
 
   useEffect(() => {
     function handler(e) {
@@ -283,34 +304,53 @@ export default function TarifView() {
     <main className="main">
       <div className="search-card">
         <div className="search-label">Filter</div>
-        <div className="filter-row">
-          <MultiSelectDropdown
-            label="Tahun"
-            options={filters.tahun || []}
-            selected={selectedTahun}
-            onChange={setSelectedTahun}
-            formatLabel={v => String(v)}
-          />
-          {showRS && (
+        <div className="filter-zone" aria-busy={filtersLoading}>
+          <div className="filter-row">
             <MultiSelectDropdown
-              label="Rumah Sakit"
-              options={availableRS}
-              selected={selectedRS}
-              onChange={setSelectedRS}
+              label="Tahun"
+              options={filters.tahun || []}
+              selected={selectedTahun}
+              onChange={setSelectedTahun}
+              formatLabel={v => String(v)}
             />
+            {showRS && (
+              <MultiSelectDropdown
+                label="Rumah Sakit"
+                options={availableRS}
+                selected={selectedRS}
+                onChange={setSelectedRS}
+              />
+            )}
+            <MultiSelectDropdown
+              label="Kategori"
+              options={availableKategori}
+              selected={selectedKategori}
+              onChange={setSelectedKategori}
+            />
+            <MultiSelectDropdown
+              label="Kelas Kamar"
+              options={availableKelas}
+              selected={selectedKelas}
+              onChange={setSelectedKelas}
+            />
+          </div>
+
+          {filtersLoading && (
+            <div className="filter-overlay" role="status">
+              <span className="spinner" />
+              <span>
+                Memuat data filter
+                <span className="loading-dots">{'.'.repeat(dots)}</span>
+              </span>
+            </div>
           )}
-          <MultiSelectDropdown
-            label="Kategori"
-            options={availableKategori}
-            selected={selectedKategori}
-            onChange={setSelectedKategori}
-          />
-          <MultiSelectDropdown
-            label="Kelas Kamar"
-            options={availableKelas}
-            selected={selectedKelas}
-            onChange={setSelectedKelas}
-          />
+
+          {!filtersLoading && filtersError && (
+            <div className="filter-overlay filter-overlay-error" role="alert">
+              <span>⚠️ Gagal memuat data filter.</span>
+              <button className="filter-retry-btn" onClick={loadFilters}>Coba lagi</button>
+            </div>
+          )}
         </div>
 
         {showGuidance && (
