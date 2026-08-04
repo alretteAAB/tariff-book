@@ -1,6 +1,9 @@
 // Utilitas kecil yang dipakai lintas tab.
 
-export const API = import.meta.env.VITE_API_URL || "/api";
+// API kini satu origin dengan SPA (Cloudflare Pages Functions di functions/api/*),
+// jadi basenya dipatok. Jangan kembalikan ke env var: nilainya disisipkan saat build,
+// sehingga nilai basi di dashboard bisa mengarahkan seluruh fetch ke host yang mati.
+export const API = "/api";
 
 export function highlight(text, query) {
   if (!query) return text;
