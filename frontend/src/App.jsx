@@ -3,7 +3,9 @@ import { styles } from "./styles.js";
 import { scrollToTop, scrollToBottom } from "./lib/utils.jsx";
 import GolonganView from "./views/GolonganView.jsx";
 import TarifView from "./views/TarifView.jsx";
-
+// by Aldo Oktavianus
+// data by Arfan Hafidt Nashrullah
+// idea Beatrice Marietta 
 // Cangkang aplikasi: menyuntikkan CSS, menggambar header + navigasi tab, lalu
 // menyerahkan isi halaman ke view yang aktif. Tiap view memegang state-nya
 // sendiri — berpindah tab akan mengosongkannya, dan itu memang disengaja.
@@ -18,7 +20,7 @@ export default function App() {
           <div className="header-icon">📒</div>
           <div>
             <div className="header-title">Buku Tarif</div>
-            <div className="header-sub">Pencarian tarif layanan & tindakan medis rumah sakit · by ASO</div>
+            <div className="header-sub">Pencarian tarif layanan & tindakan medis rumah sakit</div>
           </div>
           <nav className="nav-tabs">
             <button
@@ -42,6 +44,9 @@ export default function App() {
           <button className="scroll-btn" onClick={scrollToTop} title="Ke Atas">↑</button>
           <button className="scroll-btn" onClick={scrollToBottom} title="Ke Bawah">↓</button>
         </div>
+
+
+        
       </div>
     </>
   );
