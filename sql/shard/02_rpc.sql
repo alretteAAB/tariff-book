@@ -1,34 +1,19 @@
 -- ============================================================
--- tariff-book: canonical Postgres RPC definitions
+-- tariff-book shard: RPC definitions (run 2nd, after 01_schema.sql)
 -- ============================================================
--- Run this in the Supabase SQL Editor (role: postgres). It is idempotent
--- (every object uses CREATE OR REPLACE), so it is safe to re-run any time.
+-- Run this in the Supabase SQL Editor (role: postgres) on EVERY shard.
+-- It is idempotent, so it is safe to re-run any time.
 --
 -- WHY THIS FILE EXISTS:
 --   The RPCs used by frontend/functions/api/* must not live only inside the
 --   database, or the repo drifts from what is deployed. This file mirrors the
 --   functions running in production (pg_get_functiondef, 2026-10-14):
---   everything reads the `tarif` view, which joins the normalized `tarif_v2`
---   with its *_ref tables; hospital names come from `rumahsakit.display_name`
---   and room classes are normalized through `room_class_mapping`.
+--   everything reads the `tarif` view (01_schema.sql), which joins the
+--   normalized `tarif_v2` with its *_ref tables; hospital names come from
+--   `rumahsakit.display_name` and room classes are normalized through
+--   `room_class_mapping`.
 --   Keep this file as the single source of truth; re-run it after any change.
 -- ============================================================
-
--- --- View: denormalized tarif over tarif_v2 + reference tables --
-create or replace view tarif as
-  select t.id,
-         k.nama  as kategori_harga,
-         l.nama  as nama_layanan,
-         kk.nama as kelas_kamar,
-         t.tarif,
-         rs.nama as rumah_sakit,
-         t.tahun,
-         t.pct_increase
-  from tarif_v2 t
-  join rumah_sakit_ref rs     on rs.id = t.rumah_sakit_id
-  join kategori_ref k         on k.id  = t.kategori_id
-  left join kelas_kamar_ref kk on kk.id = t.kelas_kamar_id
-  join layanan_ref l          on l.id  = t.layanan_id;
 
 -- --- Helper: escape ILIKE wildcards -----------------------------
 create or replace function esc_like(s text)
@@ -116,16 +101,20 @@ end $$;
 -- --- RPC: suggest (autocomplete, max 6) -------------------------
 -- NOTE: the four f_* filters MUST be applied in the WHERE clause. An earlier
 -- deployed copy had drifted and returned unfiltered rows.
-create or replace function suggest_tarif(
+-- `score` (word_similarity) lets the API merge suggestions from several
+-- shards in the same order a single database would produce. The return type
+-- changed, so the old signature has to be dropped first.
+drop function if exists suggest_tarif(text, text[], text[], int[], text[]);
+create function suggest_tarif(
   q text,
   f_kategori text[] default null,
   f_rumah_sakit text[] default null,
   f_tahun int[] default null,
   f_kelas text[] default null
 )
-returns table (nama_layanan text, kategori_harga text)
+returns table (nama_layanan text, kategori_harga text, score real)
 language sql stable as $$
-  select nama_layanan::text, kategori_harga::text
+  select nama_layanan::text, kategori_harga::text, word_similarity(q, nama_layanan) as score
   from (
     select distinct on (t.nama_layanan) t.nama_layanan, t.kategori_harga
     from tarif t
@@ -138,7 +127,7 @@ language sql stable as $$
       and (f_kelas       is null or coalesce(rm.mapped_room_class, t.kelas_kamar) = any(f_kelas))
     order by t.nama_layanan
   ) s
-  order by word_similarity(q, nama_layanan) desc nulls last, nama_layanan asc
+  order by score desc nulls last, nama_layanan asc
   limit 6;
 $$;
 
@@ -192,12 +181,6 @@ returns jsonb language sql stable as $$
                           where coalesce(rm.mapped_room_class, t.kelas_kamar) is not null) x)
   );
 $$;
-
--- --- Grants (anon must be able to EXECUTE the RPCs) -------------
-grant execute on function search_tarif        to anon;
-grant execute on function suggest_tarif       to anon;
-grant execute on function compare_rows_tarif  to anon;
-grant execute on function get_filters         to anon;
 
 -- --- Refresh planner stats --------------------------------------
 analyze tarif_v2;
