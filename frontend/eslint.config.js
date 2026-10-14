@@ -17,5 +17,9 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // `const { drop, ...rest } = row` is how API handlers strip fields
+      'no-unused-vars': ['error', { ignoreRestSiblings: true }],
+    },
   },
 ])

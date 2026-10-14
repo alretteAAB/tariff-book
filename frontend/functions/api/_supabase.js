@@ -1,10 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-export function getClient(env) {
-  return createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
-    auth: { persistSession: false },
-  });
-}
+// Shared request/response helpers. Supabase clients live in _shards.js.
 
 // "?kategori=A,B" or "?kategori=A&kategori=B" -> ['A','B'] | null
 export function parseMulti(searchParams, key) {
