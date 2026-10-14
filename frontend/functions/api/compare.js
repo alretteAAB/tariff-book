@@ -25,10 +25,8 @@ export async function onRequestGet({ request, env }) {
   if (!ok.length) return json({ error: failed[0].error }, 500);
   const data = ok.flatMap(r => r.data).slice(0, SOURCE_ROW_LIMIT);
 
-  // PORT VERBATIM from backend/index.js: the pivot block inside app.get('/compare').
-  // i.e. everything from `const nonAxis = ...` through building `columns`, `allRows`,
-  // and the final response object (rowsMap / colSet / COMPARE_ROW_MAX = 500 slice).
-  // It operates purely on the fetched `data` array, so it ports unchanged.
+  // Pivot, ported unchanged from the old Express backend. It only reads the
+  // fetched `data` array, so rows combined from several shards work as-is.
   const nonAxis = FIELDS.filter(f => f !== axis);
 
   const rowsMap = new Map();

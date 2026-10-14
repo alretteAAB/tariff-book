@@ -4,7 +4,7 @@ import { mergeSorted } from './_merge.js';
 
 const EXPORT_MAX_ROWS = 50000;
 
-// PORT VERBATIM from backend/index.js (unchanged — pure formatting):
+// Ported unchanged from the old Express backend (pure formatting):
 //   EXPORT_HEADERS, exportRow(), csvCell(), escapeXml(), buildSpreadsheetML()
 const EXPORT_HEADERS = ['Tahun', 'Rumah Sakit', 'Kategori', 'Nama Layanan', 'Kelas Kamar', 'Tarif', '% vs Tahun Lalu'];
 
