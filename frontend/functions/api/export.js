@@ -1,6 +1,10 @@
-import { getClient, parseMulti, json } from './_supabase.js';
+import { parseMulti, json } from './_supabase.js';
+import { pickShards, callShards } from './_shards.js';
+import { mergeSorted } from './_merge.js';
 
-// PORT VERBATIM from backend/index.js (unchanged — pure formatting):
+const EXPORT_MAX_ROWS = 50000;
+
+// Ported unchanged from the old Express backend (pure formatting):
 //   EXPORT_HEADERS, exportRow(), csvCell(), escapeXml(), buildSpreadsheetML()
 const EXPORT_HEADERS = ['Tahun', 'Rumah Sakit', 'Kategori', 'Nama Layanan', 'Kelas Kamar', 'Tarif', '% vs Tahun Lalu'];
 
@@ -83,12 +87,17 @@ export async function onRequestGet({ request, env }) {
   const hasAny = Boolean(q) || f_kategori || f_rumah_sakit || f_tahun || f_kelas;
   if (!hasAny) return json({ error: 'Tidak ada filter atau kata kunci untuk diekspor' }, 400);
 
-  const supabase = getClient(env);
+  const shards = await pickShards(env, f_rumah_sakit);
   // Reuse search_tarif with a large page_size to get every filtered row (with pct + sort)
-  const { data: rows, error } = await supabase.rpc('search_tarif', {
-    q, f_kategori, f_rumah_sakit, f_tahun, f_kelas, sort, page: 1, page_size: 50000,
+  const { ok, failed } = await callShards(shards, 'search_tarif', {
+    q, f_kategori, f_rumah_sakit, f_tahun, f_kelas, sort, page: 1, page_size: EXPORT_MAX_ROWS,
   });
-  if (error) return json({ error: error.message }, 500);
+  if (!ok.length) return json({ error: failed[0].error }, 500);
+  const rows = ok.length === 1
+    ? ok[0].data
+    : mergeSorted(ok.map(r => r.data), sort, 0, EXPORT_MAX_ROWS);
+  // Some shards down: the file is still produced from the healthy ones
+  const partial = failed.length ? { 'x-partial-shards': failed.map(f => f.shard).join(',') } : {};
 
   const stamp = new Date().toISOString().slice(0, 10);
 
@@ -97,6 +106,7 @@ export async function onRequestGet({ request, env }) {
       headers: {
         'content-type': 'application/vnd.ms-excel; charset=utf-8',
         'content-disposition': `attachment; filename="buku-tarif-${stamp}.xls"`,
+        ...partial,
       },
     });
   }
@@ -109,6 +119,7 @@ export async function onRequestGet({ request, env }) {
     headers: {
       'content-type': 'text/csv; charset=utf-8',
       'content-disposition': `attachment; filename="buku-tarif-${stamp}.csv"`,
+      ...partial,
     },
   });
 }

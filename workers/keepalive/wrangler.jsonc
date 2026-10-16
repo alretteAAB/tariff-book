@@ -1,0 +1,20 @@
+{
+  "$schema": "../../frontend/node_modules/wrangler/config-schema.json",
+  // Pings every Supabase shard once a day so free projects are not paused
+  // for inactivity. Separate from the Pages project: Pages has no cron.
+  "name": "tariff-book-keepalive",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-23",
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
+  "observability": {
+    "enabled": true
+  },
+  // Shard URLs are not secret. Keys go in as secrets:
+  //   npx wrangler secret put SHARD_1_KEY
+  "vars": {
+    "SHARDS": "1",
+    "SHARD_1_URL": "https://wxixsguicwznoxgllfbo.supabase.co"
+  }
+}

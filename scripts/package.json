@@ -1,0 +1,12 @@
+{
+  "name": "tariff-book-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Data maintenance scripts (run locally with DATABASE_URL_n in .env)",
+  "scripts": {
+    "move-hospital": "node move-hospital.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  }
+}

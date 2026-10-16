@@ -1,6 +1,8 @@
-import { getClient, parseMulti, json } from './_supabase.js';
+import { parseMulti, json } from './_supabase.js';
+import { pickShards, callShards, partialInfo } from './_shards.js';
 
 const COMPARE_ROW_MAX = 500; // batas baris hasil pivot yang dikirim ke UI
+const SOURCE_ROW_LIMIT = 10000; // batas baris mentah, total untuk semua shard
 
 export async function onRequestGet({ request, env }) {
   const p = new URL(request.url).searchParams;
@@ -16,16 +18,15 @@ export async function onRequestGet({ request, env }) {
   const hasAny = Boolean(q) || f_kategori || f_rumah_sakit || f_tahun || f_kelas;
   if (!hasAny) return json({ axis, columns: [], rows: [], total: 0, truncated: false });
 
-  const supabase = getClient(env);
-  const { data, error } = await supabase.rpc('compare_rows_tarif', {
-    q, f_kategori, f_rumah_sakit, f_tahun, f_kelas, row_limit: 10000,
+  const shards = await pickShards(env, f_rumah_sakit);
+  const { ok, failed } = await callShards(shards, 'compare_rows_tarif', {
+    q, f_kategori, f_rumah_sakit, f_tahun, f_kelas, row_limit: SOURCE_ROW_LIMIT,
   });
-  if (error) return json({ error: error.message }, 500);
+  if (!ok.length) return json({ error: failed[0].error }, 500);
+  const data = ok.flatMap(r => r.data).slice(0, SOURCE_ROW_LIMIT);
 
-  // PORT VERBATIM from backend/index.js: the pivot block inside app.get('/compare').
-  // i.e. everything from `const nonAxis = ...` through building `columns`, `allRows`,
-  // and the final response object (rowsMap / colSet / COMPARE_ROW_MAX = 500 slice).
-  // It operates purely on the fetched `data` array, so it ports unchanged.
+  // Pivot, ported unchanged from the old Express backend. It only reads the
+  // fetched `data` array, so rows combined from several shards work as-is.
   const nonAxis = FIELDS.filter(f => f !== axis);
 
   const rowsMap = new Map();
@@ -60,6 +61,7 @@ export async function onRequestGet({ request, env }) {
     columns,
     rows: allRows.slice(0, COMPARE_ROW_MAX),
     total: allRows.length,
-    truncated: allRows.length > COMPARE_ROW_MAX
+    truncated: allRows.length > COMPARE_ROW_MAX,
+    ...partialInfo(failed)
   });
 }
