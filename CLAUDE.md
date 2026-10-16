@@ -31,6 +31,7 @@ sql/shard/runbook-reclaim-space.md
 scripts/upload_tarif.py       CSV upload; picks the shard per hospital (SHARD_n_SERVICE_KEY)
 scripts/move-hospital.js      move hospitals between shards (needs DATABASE_URL_n)
 workers/keepalive/            cron Worker: daily shard_stats() ping per shard
+docs/shard-guide.md           how-to for humans: new shard, uploading, moving, limits
 ```
 
 ## Database (per shard)
