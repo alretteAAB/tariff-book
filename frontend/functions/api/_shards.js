@@ -11,12 +11,16 @@ const FILTERS_TTL_MS = 5 * 60 * 1000;
 
 export function getShards(env) {
   const ids = (env.SHARDS || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (!ids.length) return [{ id: '1', url: env.SUPABASE_URL, key: env.SUPABASE_ANON_KEY }];
+  if (!ids.length) return [{ id: '1', url: env.SUPABASE_URL, key: env.SUPABASE_ANON_KEY, legacy: true }];
   return ids.map(id => ({ id, url: env[`SHARD_${id}_URL`], key: env[`SHARD_${id}_KEY`] }));
 }
 
 const clients = new Map();
 function clientFor(shard) {
+  if (!shard.url || !shard.key) {
+    const names = shard.legacy ? 'SUPABASE_URL / SUPABASE_ANON_KEY' : `SHARD_${shard.id}_URL / SHARD_${shard.id}_KEY`;
+    throw new Error(`${names} not set for this Cloudflare environment (Production and Preview are separate)`);
+  }
   const cacheKey = `${shard.url}|${shard.key}`;
   if (!clients.has(cacheKey)) {
     clients.set(cacheKey, createClient(shard.url, shard.key, { auth: { persistSession: false } }));
