@@ -99,11 +99,21 @@ begin
 end $$;
 
 -- --- RPC: suggest (autocomplete, max 6) -------------------------
--- NOTE: the four f_* filters MUST be applied in the WHERE clause. An earlier
--- deployed copy had drifted and returned unfiltered rows.
+-- NOTE: the four f_* filters MUST be applied. An earlier deployed copy had
+-- drifted and returned unfiltered rows.
 -- `score` (word_similarity) lets the API merge suggestions from several
--- shards in the same order a single database would produce. The return type
--- changed, so the old signature has to be dropped first.
+-- shards in the same order a single database would produce.
+--
+-- Two strategies, picked by the filters (anon has a ~3 s statement timeout):
+-- - category or hospital filter: one set-based query; those filters are
+--   selective, so Postgres starts from their indexes and reads little.
+-- - otherwise: matching service names (trigram index on layanan_ref) are
+--   walked best match first; each is checked with one index lookup on
+--   tarif_v2 and the loop stops at 6. The set-based query would scan all
+--   of tarif_v2 here, which timed out on the free plan.
+-- Both return the same names in the same order.
+-- The return type changed (score), so the old signature is dropped first;
+-- re-run 04_security.sql afterwards for the grant.
 drop function if exists suggest_tarif(text, text[], text[], int[], text[]);
 create function suggest_tarif(
   q text,
@@ -113,23 +123,58 @@ create function suggest_tarif(
   f_kelas text[] default null
 )
 returns table (nama_layanan text, kategori_harga text, score real)
-language sql stable as $$
-  select nama_layanan::text, kategori_harga::text, word_similarity(q, nama_layanan) as score
-  from (
-    select distinct on (t.nama_layanan) t.nama_layanan, t.kategori_harga
-    from tarif t
-    join rumahsakit r on r.rumah_sakit = t.rumah_sakit
-    left join room_class_mapping rm on rm.room_class = t.kelas_kamar
-    where (q is null or (t.nama_layanan ilike '%' || esc_like(q) || '%' or q <% t.nama_layanan))
-      and (f_kategori    is null or t.kategori_harga = any(f_kategori))
-      and (f_rumah_sakit is null or r.display_name    = any(f_rumah_sakit))
-      and (f_tahun       is null or t.tahun          = any(f_tahun))
-      and (f_kelas       is null or coalesce(rm.mapped_room_class, t.kelas_kamar) = any(f_kelas))
-    order by t.nama_layanan
-  ) s
-  order by score desc nulls last, nama_layanan asc
-  limit 6;
-$$;
+language plpgsql stable as $$
+#variable_conflict use_column
+declare
+  c record;
+  kat text;
+  n int := 0;
+begin
+  if f_kategori is not null or f_rumah_sakit is not null then
+    return query
+    select s.nama_layanan::text, s.kategori_harga::text, word_similarity(q, s.nama_layanan) as score
+    from (
+      select distinct on (t.nama_layanan) t.nama_layanan, t.kategori_harga
+      from tarif t
+      join rumahsakit r on r.rumah_sakit = t.rumah_sakit
+      left join room_class_mapping rm on rm.room_class = t.kelas_kamar
+      where (q is null or (t.nama_layanan ilike '%' || esc_like(q) || '%' or q <% t.nama_layanan))
+        and (f_kategori    is null or t.kategori_harga = any(f_kategori))
+        and (f_rumah_sakit is null or r.display_name    = any(f_rumah_sakit))
+        and (f_tahun       is null or t.tahun          = any(f_tahun))
+        and (f_kelas       is null or coalesce(rm.mapped_room_class, t.kelas_kamar) = any(f_kelas))
+      order by t.nama_layanan
+    ) s
+    order by 3 desc nulls last, 1 asc
+    limit 6;
+    return;
+  end if;
+
+  for c in
+    select l.id, l.nama, word_similarity(q, l.nama) as s
+    from layanan_ref l
+    where q is null or l.nama ilike '%' || esc_like(q) || '%' or q <% l.nama
+    order by s desc nulls last, l.nama asc
+  loop
+    select k.nama into kat
+    from tarif_v2 t
+    join kategori_ref k             on k.id  = t.kategori_id
+    join rumah_sakit_ref rs         on rs.id = t.rumah_sakit_id
+    join rumahsakit r               on r.rumah_sakit = rs.nama
+    left join kelas_kamar_ref kk    on kk.id = t.kelas_kamar_id
+    left join room_class_mapping rm on rm.room_class = kk.nama
+    where t.layanan_id = c.id
+      and (f_tahun is null or t.tahun = any(f_tahun))
+      and (f_kelas is null or coalesce(rm.mapped_room_class, kk.nama) = any(f_kelas))
+    limit 1;
+    if found then
+      nama_layanan := c.nama; kategori_harga := kat; score := c.s;
+      return next;
+      n := n + 1;
+      exit when n = 6;
+    end if;
+  end loop;
+end $$;
 
 -- --- RPC: raw rows for /compare (pivot happens in JS) -----------
 create or replace function compare_rows_tarif(
