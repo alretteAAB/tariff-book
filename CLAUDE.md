@@ -28,6 +28,7 @@ frontend/functions/api/
 frontend/test/merge.test.js   npm test (node --test)
 sql/shard/        01_schema → 02_rpc → 03_shard_stats → 04_security (run in order)
 sql/shard/runbook-reclaim-space.md
+scripts/upload_tarif.py       CSV upload; picks the shard per hospital (SHARD_n_SERVICE_KEY)
 scripts/move-hospital.js      move hospitals between shards (needs DATABASE_URL_n)
 workers/keepalive/            cron Worker: daily shard_stats() ping per shard
 ```
@@ -50,8 +51,8 @@ f_tahun, f_kelas, sort, page, page_size)`, `suggest_tarif(q, f_*)` (returns
 it on every shard. Re-running `02_rpc.sql` drops/recreates `suggest_tarif`, so
 always run `04_security.sql` after it (grants).
 
-Reference ids are local to each shard; tooling that copies rows re-links by
-name. `tarif_v2.id` is global (set by the upload script) and kept on moves.
+Reference ids and `tarif_v2.id` are local to each shard (identity columns);
+tooling that copies rows re-links by name and lets the target assign ids.
 
 ## Sharding
 
@@ -86,6 +87,7 @@ How the router behaves (`_shards.js`):
 cd frontend && npm install && npm run build   # Pages build (root: frontend, output: dist)
 cd frontend && npm test                       # merge helper unit tests
 cd frontend && npx wrangler pages functions build --outdir /tmp/fn   # check Functions bundle
+cd scripts && pip install -r requirements.txt && python upload_tarif.py data.csv --dry-run
 cd scripts && npm install && node move-hospital.js --from 1 --to 2 --rs "Nama RS" [--delete]
 cd workers/keepalive && npx wrangler secret put SHARD_1_KEY && npx wrangler deploy
 ```
@@ -97,6 +99,11 @@ Cloudflare Pages build settings: root `frontend`, build command
 
 - **RLS:** the anon key respects RLS. Every table needs the `public read …`
   policy from `04_security.sql`, or queries return 0 rows without error.
+- **Uploads:** `upload_tarif.py` keeps a hospital on the shard that already
+  has it; new hospitals go to the shard with the most room (estimate: 260
+  bytes/row, 50 MB headroom under 500 MB). It never overwrites an existing
+  `rumahsakit.display_name`. Re-running skips identical rows, except rows with
+  an empty `kelas_kamar` (NULL is never a duplicate under the unique constraint).
 - **`pg` does not run on the Workers runtime.** Functions use supabase-js only;
   `pg` is for `scripts/` on your machine.
 - **Underscore files** in `functions/api/` export no handlers, so they are not routes.
