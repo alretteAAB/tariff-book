@@ -32,6 +32,11 @@ and **Run**, in this order:
 | 3 | `03_shard_stats.sql` | `shard_stats()` (size + hospitals) |
 | 4 | `04_security.sql` | read-only access for the website (RLS + grants) |
 
+`05_strict_unique.sql` is only for shards created before it existed (shard 1,
+and shard 2 if it was set up before October 17, 2026): it removes duplicate
+rows with empty columns and makes the database reject them from then on. New
+shards get this from `01_schema.sql`.
+
 Check: `select shard_stats();` returns `"hospitals": []` and a small `db_size`.
 
 `room_class_mapping` (room class names) does not need copying by hand: the
@@ -147,9 +152,10 @@ At the end it prints the row count per hospital. Compare with your CSV.
 - New hospitals get `display_name` = the raw name. To tidy it (e.g.
   `Rs Contoh` → `RS Contoh`), edit the `rumahsakit` table on **that hospital's
   shard** (Table Editor). Re-uploads never overwrite your edit.
-- Interrupted? Run the same command again: rows already there are skipped.
-  Exception: rows with an empty `kelas_kamar` get inserted twice, so check
-  the counts if the CSV has many of those.
+- Interrupted, or ran it twice? Run the same command again: rows that are
+  already there are skipped by the database itself (also rows with an empty
+  `kelas_kamar`, once `05_strict_unique.sql` has run on that shard). The
+  dry run shows how many rows each hospital already has.
 
 ---
 

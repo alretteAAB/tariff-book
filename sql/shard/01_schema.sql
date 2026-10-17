@@ -61,8 +61,10 @@ create table if not exists tarif_v2 (
   tahun          smallint,
   tarif          bigint,
   pct_increase   numeric,
+  -- NULLS NOT DISTINCT: rows that only differ by an empty column (e.g. no
+  -- kelas_kamar) still count as duplicates (see 05_strict_unique.sql)
   constraint tarif_v2_unique_combo
-    unique (rumah_sakit_id, kategori_id, kelas_kamar_id, layanan_id, tahun, tarif)
+    unique nulls not distinct (rumah_sakit_id, kategori_id, kelas_kamar_id, layanan_id, tahun, tarif)
 );
 
 -- --- Indexes ----------------------------------------------------

@@ -152,9 +152,9 @@ class ShardWriter:
             "pct_increase":   clean(getattr(r, "pct_increase", None)),
         } for r in df.itertuples(index=False)]
         for i in range(0, len(rows), BATCH_SIZE):
-            # Baris yang persis sama (unique combo) dilewati, jadi upload yang
-            # terputus bisa diulang. Kecuali baris tanpa kelas_kamar: NULL tidak
-            # dianggap sama oleh constraint, jadi baris itu akan terduplikasi.
+            # Baris yang persis sama dengan yang sudah ada (tarif_v2_unique_combo,
+            # termasuk kolom kosong setelah 05_strict_unique.sql) dilewati, jadi
+            # upload yang terputus atau terulang aman dijalankan lagi.
             self.db.table("tarif_v2").upsert(
                 rows[i:i + BATCH_SIZE], on_conflict=UNIQUE_COLS, ignore_duplicates=True
             ).execute()
@@ -167,7 +167,11 @@ def fetch_stats(clients: dict) -> dict:
     stats = {}
     for sid, client in clients.items():
         s = client.rpc("shard_stats").execute().data
-        stats[sid] = {"size": s["db_size_bytes"], "hospitals": {h["rumah_sakit"] for h in s["hospitals"]}}
+        stats[sid] = {
+            "size": s["db_size_bytes"],
+            "hospitals": {h["rumah_sakit"] for h in s["hospitals"]},
+            "rows": {h["rumah_sakit"]: h["rows"] for h in s["hospitals"]},
+        }
         print(f"shard {sid}: {s['db_size']}, {len(s['hospitals'])} RS")
     return stats
 
@@ -190,8 +194,14 @@ def main() -> None:
     plan = choose_shards(rows_per_rs, stats)
     print("\nRencana:")
     for rs, sid in sorted(plan.items(), key=lambda kv: (kv[1], kv[0])):
-        status = "tambah" if rs in stats[sid]["hospitals"] else "baru"
-        print(f"  shard {sid}  {status:6}  {rows_per_rs[rs]:>7} baris  {rs}")
+        existing = stats[sid]["rows"].get(rs, 0)
+        status = "tambah" if existing else "baru"
+        note = f"  (sudah ada {existing} baris di shard ini)" if existing else ""
+        print(f"  shard {sid}  {status:6}  {rows_per_rs[rs]:>7} baris  {rs}{note}")
+    if any(stats[sid]["rows"].get(rs) for rs, sid in plan.items()):
+        print("\nRS bertanda 'tambah' sudah punya data. Baris yang sama persis dengan yang\n"
+              "sudah ada akan dilewati; hanya baris yang benar-benar baru yang masuk.\n"
+              "Kalau CSV ini pernah di-upload, tidak ada yang berubah.")
     if args.dry_run:
         print("\n--dry-run: tidak ada yang ditulis.")
         return
