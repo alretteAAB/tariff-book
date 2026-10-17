@@ -27,6 +27,7 @@ frontend/functions/api/
   filters.js  search.js  suggest.js  export.js  compare.js   → /api/<name>
 frontend/test/merge.test.js   npm test (node --test)
 sql/shard/        01_schema → 02_rpc → 03_shard_stats → 04_security (run in order)
+                  05_strict_unique: one-off for shards created before it (01 has it built in)
 sql/shard/runbook-reclaim-space.md
 scripts/upload_tarif.py       CSV upload; picks the shard per hospital (SHARD_n_SERVICE_KEY)
 scripts/move-hospital.js      move hospitals between shards (needs DATABASE_URL_n)
@@ -103,8 +104,10 @@ Cloudflare Pages build settings: root `frontend`, build command
 - **Uploads:** `upload_tarif.py` keeps a hospital on the shard that already
   has it; new hospitals go to the shard with the most room (estimate: 260
   bytes/row, 50 MB headroom under 500 MB). It never overwrites an existing
-  `rumahsakit.display_name`. Re-running skips identical rows, except rows with
-  an empty `kelas_kamar` (NULL is never a duplicate under the unique constraint).
+  `rumahsakit.display_name`. Re-running skips identical rows: the database
+  rejects them via `tarif_v2_unique_combo`, which is `UNIQUE NULLS NOT
+  DISTINCT` so rows with an empty `kelas_kamar` count as duplicates too
+  (`05_strict_unique.sql` converts shards created before that).
 - **`pg` does not run on the Workers runtime.** Functions use supabase-js only;
   `pg` is for `scripts/` on your machine.
 - **Underscore files** in `functions/api/` export no handlers, so they are not routes.
