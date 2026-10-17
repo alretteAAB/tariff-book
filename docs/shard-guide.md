@@ -1,4 +1,5 @@
 # Shard guide: adding shards, uploading data, day-to-day care
+Trigger Deployment
 
 A **shard** is one Supabase project holding some of the hospitals. Shard 1
 is the project you already have (`wxixsguicwznoxgllfbo`). The website asks
