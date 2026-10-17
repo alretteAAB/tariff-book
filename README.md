@@ -1,6 +1,6 @@
 # tariff-book
 
-A project that is made for stakeholders to check the price for each layanan that hospital give.
+A project that is made for stakeholders to check the price for each layanan that hospital gives.
 
 - **App + API:** `frontend/` (React SPA and Cloudflare Pages Functions under `frontend/functions/api`), deployed to Cloudflare Pages.
 - **Data:** Supabase Postgres, split per hospital across one or more Supabase projects (shards). Schema and RPCs: `sql/shard/`.
