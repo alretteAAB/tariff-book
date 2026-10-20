@@ -35,7 +35,6 @@ scripts/upload_tarif.py       CSV upload; picks the shard per hospital (SHARD_n_
 scripts/move-hospital.js      move hospitals between shards (needs DATABASE_URL_n)
 sql/golongan/     01_schema → 02_rpc → 03_security  (golongan operasi project)
 scripts/upload_golongan.py    CSV upload of golongan operasi (GOLONGAN_SERVICE_KEY)
-data/golongan_operasi*.csv    source CSVs of the golongan data (initial upload)
 workers/keepalive/            cron Worker: daily shard_stats() ping per shard
 docs/shard-guide.md           how-to for humans: new shard, uploading, moving, limits
 ```
@@ -111,7 +110,7 @@ cd frontend && npm test                       # merge helper unit tests
 cd frontend && npx wrangler pages functions build --outdir /tmp/fn   # check Functions bundle
 cd scripts && pip install -r requirements.txt && python upload_tarif.py data.csv --dry-run
 cd scripts && npm install && node move-hospital.js --from 1 --to 2 --rs "Nama RS" [--delete]
-cd scripts && python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv --dry-run
+cd scripts && python upload_golongan.py buku_golongan.csv --dry-run
 cd workers/keepalive && npx wrangler secret put SHARD_1_KEY && npx wrangler deploy
 ```
 

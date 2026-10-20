@@ -223,13 +223,15 @@ it is not in `SHARDS`, and the hospital rules above do not apply to it.
    GOLONGAN_URL=https://xxxx.supabase.co
    GOLONGAN_SERVICE_KEY=eyJ...      (service_role, tab Legacy)
    ```
-4. Upload the existing data (the two CSVs in `data/`):
+4. Upload the golongan CSVs (format in 4.2). The original two books
+   (Mitra Keluarga Bekasi Timur, 2198 rows; Grand Wisata, 1332 rows) were
+   uploaded on 2026-10-20; their CSVs are no longer in the repo (in git
+   history before that date, and kept outside the repo as a backup).
    ```bash
    cd scripts
-   python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv --dry-run
-   python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv
+   python upload_golongan.py buku_golongan_rs_a.csv buku_golongan_rs_b.csv --dry-run
+   python upload_golongan.py buku_golongan_rs_a.csv buku_golongan_rs_b.csv
    ```
-   Expected at the end: 2198 Mitra Keluarga Bekasi Timur, 1332 Mitra Keluarga Grand Wisata.
 5. Cloudflare Pages → Settings → Variables and Secrets, **Preview and
    Production**: `GOLONGAN_URL` = the project URL, `GOLONGAN_KEY` = its
    publishable (or legacy anon) key. Then **Retry deployment**.
