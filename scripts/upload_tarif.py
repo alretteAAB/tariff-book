@@ -28,6 +28,16 @@ from pathlib import Path
 
 import pandas as pd
 
+# HTTPS via the operating system's certificate store (Windows/macOS) instead
+# of Python's own list, so uploads also work behind office proxies/antivirus
+# that inspect HTTPS with their own certificate ("CERTIFICATE_VERIFY_FAILED").
+# Verification stays on. upload_golongan.py gets this by importing this module.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
+
 # Ukuran per baris termasuk index dan tabel referensi: 447 MB / 1,83 juta
 # baris di shard 1 (Oktober 2026), dibulatkan ke atas.
 BYTES_PER_ROW = 260
