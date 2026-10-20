@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import golonganData from "../data/golongan-operasi.json";
-import { highlight } from "../lib/utils.jsx";
+import { useState, useEffect, useCallback } from "react";
+import { API, highlight } from "../lib/utils.jsx";
 import { InfoTip } from "../components/InfoTip.jsx";
 import { MultiSelectDropdown } from "../components/MultiSelectDropdown.jsx";
 import { Pagination } from "../components/Pagination.jsx";
@@ -9,30 +8,10 @@ import { SortableTh } from "../components/SortableTh.jsx";
 
 // ─── GolonganView ───────────────────────────────────────────────────
 // Tab kedua: referensi golongan tindakan operasi (rumah sakit · spesialisasi ·
-// golongan · nama layanan). Datanya statis dan ikut di-bundle
-// (src/data/golongan-operasi.json, gabungan dari berkas-berkas di data/), jadi
-// semua pencarian, filter, pengurutan, dan paginasi dilakukan di sisi klien —
-// tanpa panggilan API.
-//
-// Catatan data: buku Grand Wisata menulis golongan dengan awalan "OPERASI "
-// ("OPERASI KECIL"), Bekasi Timur tanpa awalan. Awalan itu dibuang saat data
-// dibuat agar keduanya jadi satu nilai di filter dan pengurutan.
-
-// Urutan golongan mengikuti tingkatannya, bukan abjad. 'SEDANG' tanpa angka
-// hanya dipakai Grand Wisata, ditaruh sebelum tingkat SEDANG yang bernomor.
-const GOL_ORDER = [
-  'KECIL', 'SEDANG', 'SEDANG 1', 'SEDANG 2', 'SEDANG 3',
-  'BESAR 1', 'BESAR 2', 'BESAR 3',
-  'KHUSUS 1', 'KHUSUS 2', 'KHUSUS 3',
-];
-const golRank = (g) => {
-  const i = GOL_ORDER.indexOf(g);
-  return i === -1 ? GOL_ORDER.length : i;
-};
-
-const GOL_RUMAH_SAKIT = [...new Set(golonganData.map(r => r.rumah_sakit))].sort((a, b) => a.localeCompare(b, 'id'));
-const GOL_SPECIALTIES = [...new Set(golonganData.map(r => r.specialty))].sort((a, b) => a.localeCompare(b, 'id'));
-const GOL_GOLONGAN = [...new Set(golonganData.map(r => r.golongan))].sort((a, b) => golRank(a) - golRank(b));
+// golongan · nama layanan). Datanya ada di project Supabase tersendiri
+// (sql/golongan/*), diambil lewat /api/golongan; pencarian, filter, urutan,
+// dan paginasi dikerjakan database. Isi dropdown dari /api/golongan/filters
+// (golongan sudah urut menurut tingkat: Kecil → Sedang → Besar → Khusus).
 
 const GOL_SORT_FIELDS = [
   { col: 'rumah_sakit', label: 'Rumah Sakit' },
@@ -46,90 +25,160 @@ const GOL_DEFAULT_SORT = [
   { col: 'golongan', dir: 'asc' },
 ];
 const GOL_PAGE_SIZE = 50;
+const SEARCH_DEBOUNCE_MS = 300;
 
 export default function GolonganView() {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selRS, setSelRS] = useState([]);
   const [selSpec, setSelSpec] = useState([]);
   const [selGol, setSelGol] = useState([]);
   const [sortKeys, setSortKeys] = useState(GOL_DEFAULT_SORT);
   const [page, setPage] = useState(1);
 
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = golonganData.filter(r =>
-      (!q || r.nama_layanan.toLowerCase().includes(q) || r.specialty.toLowerCase().includes(q)) &&
-      (!selRS.length || selRS.includes(r.rumah_sakit)) &&
-      (!selSpec.length || selSpec.includes(r.specialty)) &&
-      (!selGol.length || selGol.includes(r.golongan))
-    );
-    // Golongan diurutkan berdasarkan tingkat (GOL_ORDER), kolom lain secara abjad.
-    return filtered.sort((a, b) => {
-      for (const k of sortKeys) {
-        const d = k.col === 'golongan'
-          ? golRank(a.golongan) - golRank(b.golongan)
-          : a[k.col].localeCompare(b[k.col], 'id');
-        if (d) return k.dir === 'asc' ? d : -d;
-      }
-      return a.nama_layanan.localeCompare(b.nama_layanan, 'id');
-    });
-  }, [query, selRS, selSpec, selGol, sortKeys]);
+  const [filters, setFilters] = useState({ rumah_sakit: [], specialty: [], golongan: [] });
+  const [filtersLoading, setFiltersLoading] = useState(true);
+  const [filtersError, setFiltersError] = useState(false);
 
-  const totalPages = Math.ceil(rows.length / GOL_PAGE_SIZE);
-  // Dijepit saat render agar halaman tidak sempat "kosong" satu frame ketika
-  // hasil menyusut; efek di bawah yang mengembalikan state-nya ke 1.
-  const curPage = Math.min(page, Math.max(totalPages, 1));
-  const pageRows = rows.slice((curPage - 1) * GOL_PAGE_SIZE, curPage * GOL_PAGE_SIZE);
+  // Hasil terakhir beserta kunci permintaannya; selama kunci berbeda dengan
+  // kriteria sekarang, berarti data baru sedang dimuat.
+  const [resp, setResp] = useState({ key: null, data: [], total: 0, totalPages: 0, error: null });
 
-  // Kembali ke halaman 1 setiap kali hasil berubah
-  useEffect(() => { setPage(1); }, [query, selRS, selSpec, selGol, sortKeys]);
+  // Setiap perubahan kriteria mengembalikan ke halaman 1.
+  const withPageReset = (setter) => (value) => { setter(value); setPage(1); };
+  const changeRS = withPageReset(setSelRS);
+  const changeSpec = withPageReset(setSelSpec);
+  const changeGol = withPageReset(setSelGol);
+  const changeSort = withPageReset(setSortKeys);
+
+  const fetchFilters = useCallback(() => {
+    fetch(`${API}/golongan/filters`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(setFilters)
+      .catch(err => { console.error(err); setFiltersError(true); })
+      .finally(() => setFiltersLoading(false));
+  }, []);
+
+  const retryFilters = () => {
+    setFiltersLoading(true);
+    setFiltersError(false);
+    fetchFilters();
+  };
+
+  useEffect(() => { fetchFilters(); }, [fetchFilters]);
+
+  // Ketikan baru dikirim setelah jeda singkat, bukan per huruf.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQuery(prev => {
+        const next = query.trim();
+        if (next !== prev) setPage(1);
+        return next;
+      });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const params = new URLSearchParams();
+  if (debouncedQuery) params.set('q', debouncedQuery);
+  selRS.forEach(v => params.append('rumah_sakit', v));
+  selSpec.forEach(v => params.append('specialty', v));
+  selGol.forEach(v => params.append('golongan', v));
+  params.set('sort', sortKeys.map(k => `${k.col}:${k.dir}`).join(','));
+  params.set('page', page);
+  const requestKey = params.toString();
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`${API}/golongan?${requestKey}`, { signal: ctrl.signal })
+      .then(r => r.json().then(body => {
+        if (!r.ok || body.error) throw new Error(body.error || `HTTP ${r.status}`);
+        return body;
+      }))
+      .then(body => setResp({ key: requestKey, ...body, error: null }))
+      .catch(err => {
+        if (err.name === 'AbortError') return;
+        console.error(err);
+        setResp({
+          key: requestKey, data: [], total: 0, totalPages: 0,
+          error: 'Gagal memuat data golongan. Periksa koneksi dan coba lagi.',
+        });
+      });
+    return () => ctrl.abort();
+  }, [requestKey]);
+
+  const loading = resp.key !== requestKey;
+  const error = loading ? null : resp.error;
+  const pageRows = loading ? [] : resp.data;
+  const total = resp.total;
+  const totalPages = resp.totalPages;
+  const curPage = page;
 
   // Klik header: jadikan kolom ini kunci tunggal (toggle arah bila sudah tunggal).
   // Shift+klik: tambah sebagai tingkat urutan berikutnya.
   const handleSort = (col, additive) => {
     const idx = sortKeys.findIndex(k => k.col === col);
     if (additive) {
-      if (idx === -1) return setSortKeys([...sortKeys, { col, dir: 'asc' }]);
-      return setSortKeys(sortKeys.map((k, i) => i === idx ? { ...k, dir: k.dir === 'asc' ? 'desc' : 'asc' } : k));
+      if (idx === -1) return changeSort([...sortKeys, { col, dir: 'asc' }]);
+      return changeSort(sortKeys.map((k, i) => i === idx ? { ...k, dir: k.dir === 'asc' ? 'desc' : 'asc' } : k));
     }
     const dir = sortKeys.length === 1 && idx === 0 && sortKeys[0].dir === 'asc' ? 'desc' : 'asc';
-    setSortKeys([{ col, dir }]);
+    changeSort([{ col, dir }]);
   };
 
   const handleClear = () => {
-    setQuery(""); setSelRS([]); setSelSpec([]); setSelGol([]);
+    setQuery(""); setSelRS([]); setSelSpec([]); setSelGol([]); setPage(1);
     setSortKeys(GOL_DEFAULT_SORT);
   };
 
   const activeGroups = [
-    { type: 'rs', label: 'Rumah Sakit', values: selRS, set: setSelRS },
-    { type: 'spec', label: 'Spesialisasi', values: selSpec, set: setSelSpec },
-    { type: 'gol', label: 'Golongan', values: selGol, set: setSelGol },
+    { type: 'rs', label: 'Rumah Sakit', values: selRS, set: changeRS },
+    { type: 'spec', label: 'Spesialisasi', values: selSpec, set: changeSpec },
+    { type: 'gol', label: 'Golongan', values: selGol, set: changeGol },
   ].filter(g => g.values.length > 0);
 
   return (
     <main className="main">
       <div className="search-card">
         <div className="search-label">Filter</div>
+        <div className="filter-zone" aria-busy={filtersLoading}>
         <div className="filter-row">
           <MultiSelectDropdown
             label="Rumah Sakit"
-            options={GOL_RUMAH_SAKIT}
+            options={filters.rumah_sakit}
             selected={selRS}
-            onChange={setSelRS}
+            onChange={changeRS}
           />
           <MultiSelectDropdown
             label="Spesialisasi"
-            options={GOL_SPECIALTIES}
+            options={filters.specialty}
             selected={selSpec}
-            onChange={setSelSpec}
+            onChange={changeSpec}
           />
           <MultiSelectDropdown
             label="Golongan"
-            options={GOL_GOLONGAN}
+            options={filters.golongan}
             selected={selGol}
-            onChange={setSelGol}
+            onChange={changeGol}
           />
+        </div>
+
+          {filtersLoading && (
+            <div className="filter-overlay" role="status">
+              <span className="spinner" />
+              <span>Memuat data filter...</span>
+            </div>
+          )}
+
+          {!filtersLoading && filtersError && (
+            <div className="filter-overlay filter-overlay-error" role="alert">
+              <span>⚠️ Gagal memuat data filter.</span>
+              <button className="filter-retry-btn" onClick={retryFilters}>Coba lagi</button>
+            </div>
+          )}
         </div>
 
         {activeGroups.length > 0 && (
@@ -181,10 +230,12 @@ export default function GolonganView() {
 
       <div className="results-meta">
         <div className="results-count">
-          {rows.length > 0 ? (
+          {loading ? (
+            <>Memuat...</>
+          ) : total > 0 ? (
             <>
-              Menampilkan <span>{(curPage - 1) * GOL_PAGE_SIZE + 1}–{(curPage - 1) * GOL_PAGE_SIZE + pageRows.length}</span> dari <span>{rows.length}</span> tindakan
-              {query && <> untuk "<span>{query}</span>"</>}
+              Menampilkan <span>{(curPage - 1) * GOL_PAGE_SIZE + 1}–{(curPage - 1) * GOL_PAGE_SIZE + pageRows.length}</span> dari <span>{total}</span> tindakan
+              {debouncedQuery && <> untuk "<span>{debouncedQuery}</span>"</>}
             </>
           ) : (
             <>Tidak ada tindakan yang cocok</>
@@ -196,12 +247,20 @@ export default function GolonganView() {
             <SortPanel
               fields={GOL_SORT_FIELDS}
               sortKeys={sortKeys}
-              onChange={(keys) => setSortKeys(keys.length ? keys : GOL_DEFAULT_SORT)}
+              onChange={(keys) => changeSort(keys.length ? keys : GOL_DEFAULT_SORT)}
               defaultSort={GOL_DEFAULT_SORT}
             />
           </div>
         </div>
       </div>
+
+      {error && (
+        <div className="state-box" style={{ borderColor: 'rgba(192,57,43,0.3)', background: 'rgba(192,57,43,0.05)', marginBottom: 22 }}>
+          <div className="state-icon">⚠️</div>
+          <div className="state-title" style={{ color: '#e74c3c', fontFamily: 'var(--font-body)', fontSize: 16 }}>Terjadi Kesalahan</div>
+          <div className="state-sub">{error}</div>
+        </div>
+      )}
 
       <div className="table-wrap">
         <table>
@@ -219,7 +278,12 @@ export default function GolonganView() {
             </tr>
           </thead>
           <tbody>
-            {pageRows.length === 0 && (
+            {loading && (
+              <tr className="loading-row">
+                <td colSpan={4}><div className="spinner" /></td>
+              </tr>
+            )}
+            {!loading && !error && pageRows.length === 0 && (
               <tr>
                 <td colSpan={4} style={{ padding: '52px', textAlign: 'center' }}>
                   <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.5 }}>🔍</div>
@@ -232,19 +296,19 @@ export default function GolonganView() {
                 </td>
               </tr>
             )}
-            {pageRows.map((r) => (
-              <tr key={`${r.rumah_sakit}-${r.specialty}-${r.golongan}-${r.nama_layanan}`}>
+            {!loading && pageRows.map((r, i) => (
+              <tr key={`${r.rumah_sakit}-${r.specialty}-${r.golongan}-${r.service_code}-${r.nama_layanan}-${i}`}>
                 <td><span className="td-rs">{r.rumah_sakit}</span></td>
-                <td><span className="td-spec">{highlight(r.specialty, query)}</span></td>
+                <td><span className="td-spec">{highlight(r.specialty, debouncedQuery)}</span></td>
                 <td><span className="td-golongan">{r.golongan}</span></td>
-                <td><span className="td-layanan">{highlight(r.nama_layanan, query)}</span></td>
+                <td><span className="td-layanan">{highlight(r.nama_layanan, debouncedQuery)}</span></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <Pagination page={curPage} totalPages={totalPages} onPage={setPage} />
-      {totalPages > 1 && (
+      {totalPages > 1 && !loading && (
         <div className="pagination-info">Halaman {curPage} dari {totalPages}</div>
       )}
     </main>

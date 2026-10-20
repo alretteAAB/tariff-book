@@ -205,3 +205,47 @@ Edit the file in `sql/shard/`, then run it on **every** shard. If you re-run
 ### 3.6 If a key leaks
 Supabase → Project Settings → API → roll the key. Then update it where it is
 used (Cloudflare variables + Retry deployment, keep-alive secret, `scripts/.env`).
+
+---
+
+## 4. The golongan operasi project
+
+The "Golongan Operasi" tab has its own Supabase project. It is not a shard:
+it is not in `SHARDS`, and the hospital rules above do not apply to it.
+
+### 4.1 Set it up (once)
+1. New Supabase project (same region as the shards). Save the DB password.
+2. SQL Editor, in this order: `sql/golongan/01_schema.sql`,
+   `sql/golongan/02_rpc.sql`, `sql/golongan/03_security.sql`.
+   Check: `select shard_stats();` returns `"hospitals": []`.
+3. `scripts/.env`:
+   ```
+   GOLONGAN_URL=https://xxxx.supabase.co
+   GOLONGAN_SERVICE_KEY=eyJ...      (service_role, tab Legacy)
+   ```
+4. Upload the existing data (the two CSVs in `data/`):
+   ```bash
+   cd scripts
+   python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv --dry-run
+   python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv
+   ```
+   Expected at the end: 2198 Mitra Keluarga Bekasi Timur, 1332 Mitra Keluarga Grand Wisata.
+5. Cloudflare Pages → Settings → Variables and Secrets, **Preview and
+   Production**: `GOLONGAN_URL` = the project URL, `GOLONGAN_KEY` = its
+   publishable (or legacy anon) key. Then **Retry deployment**.
+6. Check `https://…pages.dev/api/golongan/filters` (lists of hospitals,
+   specialties, golongan) and open the Golongan Operasi tab.
+7. Keep-alive: add `"GOLONGAN_URL"` to `workers/keepalive/wrangler.jsonc`
+   vars, `npx wrangler secret put GOLONGAN_KEY`, `npx wrangler deploy`.
+
+### 4.2 Add a hospital's golongan book
+CSV columns: `rumah_sakit, specialty, golongan, nama_layanan` and optionally
+`service_code`. A leading `OPERASI ` in golongan is removed automatically.
+Golongan values outside KECIL / SEDANG(1-3) / BESAR 1-3 / KHUSUS 1-3 are
+listed in the dry run (they sort last). Uploading the same file again adds
+nothing (the database rejects identical rows).
+```bash
+python upload_golongan.py buku_golongan_rs_baru.csv --dry-run
+python upload_golongan.py buku_golongan_rs_baru.csv
+```
+New data shows on the site right away; no deploy needed.

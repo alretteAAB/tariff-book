@@ -13,6 +13,8 @@
   },
   // Shard URLs are not secret. Keys go in as secrets:
   //   npx wrangler secret put SHARD_1_KEY
+  // Golongan operasi project: add "GOLONGAN_URL" here and
+  //   npx wrangler secret put GOLONGAN_KEY
   "vars": {
     "SHARDS": "1",
     "SHARD_1_URL": "https://wxixsguicwznoxgllfbo.supabase.co"

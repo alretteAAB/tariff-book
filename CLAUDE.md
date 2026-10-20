@@ -25,12 +25,17 @@ frontend/functions/api/
   _shards.js     shard registry, hospital→shard map, fan-out (no route)
   _merge.js      pure merge helpers: sort comparator, suggest/filters merge
   filters.js  search.js  suggest.js  export.js  compare.js   → /api/<name>
+  _golongan.js   client for the golongan project (GOLONGAN_URL / GOLONGAN_KEY)
+  golongan/index.js  golongan/filters.js   → /api/golongan, /api/golongan/filters
 frontend/test/merge.test.js   npm test (node --test)
 sql/shard/        01_schema → 02_rpc → 03_shard_stats → 04_security (run in order)
                   05_strict_unique: one-off for shards created before it (01 has it built in)
 sql/shard/runbook-reclaim-space.md
 scripts/upload_tarif.py       CSV upload; picks the shard per hospital (SHARD_n_SERVICE_KEY)
 scripts/move-hospital.js      move hospitals between shards (needs DATABASE_URL_n)
+sql/golongan/     01_schema → 02_rpc → 03_security  (golongan operasi project)
+scripts/upload_golongan.py    CSV upload of golongan operasi (GOLONGAN_SERVICE_KEY)
+data/golongan_operasi*.csv    source CSVs of the golongan data (initial upload)
 workers/keepalive/            cron Worker: daily shard_stats() ping per shard
 docs/shard-guide.md           how-to for humans: new shard, uploading, moving, limits
 ```
@@ -83,6 +88,21 @@ How the router behaves (`_shards.js`):
   failedShards: [...]`, exports get header `x-partial-shards`. All shards
   failing → 500.
 
+## Golongan operasi project
+
+The "Golongan Operasi" tab reads a separate Supabase project (not a tarif
+shard, not in `SHARDS`): table `golongan_operasi(rumah_sakit, specialty,
+golongan, service_code, nama_layanan)`, RPCs `search_golongan(q,
+f_rumah_sakit, f_specialty, f_golongan, sort, page, page_size)`,
+`get_golongan_filters()`, `shard_stats()`. Search, filters, sort and paging
+run in the database; golongan sorts by tier (`golongan_rank`: KECIL → SEDANG →
+BESAR → KHUSUS), text sorts with the ICU `id` collation `golongan_id` so the
+order matches the browser's old `localeCompare('id')`.
+Env in Cloudflare Pages (Production and Preview): `GOLONGAN_URL`,
+`GOLONGAN_KEY` (publishable/anon key). Missing env → `/api/golongan` returns
+500 with the variable names. The keep-alive Worker pings it when
+`GOLONGAN_URL` is set.
+
 ## Commands
 
 ```bash
@@ -91,6 +111,7 @@ cd frontend && npm test                       # merge helper unit tests
 cd frontend && npx wrangler pages functions build --outdir /tmp/fn   # check Functions bundle
 cd scripts && pip install -r requirements.txt && python upload_tarif.py data.csv --dry-run
 cd scripts && npm install && node move-hospital.js --from 1 --to 2 --rs "Nama RS" [--delete]
+cd scripts && python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv --dry-run
 cd workers/keepalive && npx wrangler secret put SHARD_1_KEY && npx wrangler deploy
 ```
 
