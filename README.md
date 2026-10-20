@@ -8,7 +8,7 @@ A project that is made for stakeholders to check the price for each layanan that
 - **Maintenance:** `scripts/upload_tarif.py` (upload CSV to the right shard), `scripts/move-hospital.js` (move hospitals between shards), `workers/keepalive` (daily ping so free projects stay active), `sql/shard/runbook-reclaim-space.md`.
 
 How to add a shard, upload data and look after the shards: `docs/shard-guide.md`.
-Architecture, environment variables and gotchas: `CLAUDE.md`.
+Architecture, environment variables and gotchas: `CLAUDE.md`..
 
 ```bash
 cd frontend
