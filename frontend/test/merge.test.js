@@ -85,11 +85,13 @@ test('mergeFilters unions and sorts like get_filters', () => {
     kategori: ['TARIF LAB'], rumah_sakit: ['RS B'], tahun: [2025], kelas_kamar: ['VIP'],
     relations: [{ kategori_harga: 'TARIF LAB', rumah_sakit: 'RS B' }],
     kelas_relations: [{ kelas_kamar: 'VIP', rumah_sakit: 'RS B' }],
+    rs_tahun: [{ rumah_sakit: 'RS B', tahun: 2025 }],
   };
   const s2 = {
     kategori: ['TARIF LAB', 'TARIF IGD'], rumah_sakit: ['RS A'], tahun: [2026, 2025], kelas_kamar: ['Kelas 1', 'VIP'],
     relations: [{ kategori_harga: 'TARIF LAB', rumah_sakit: 'RS A' }, { kategori_harga: 'TARIF LAB', rumah_sakit: 'RS B' }],
     kelas_relations: [{ kelas_kamar: 'Kelas 1', rumah_sakit: 'RS A' }],
+    rs_tahun: [{ rumah_sakit: 'RS A', tahun: 2026 }, { rumah_sakit: 'RS A', tahun: 2025 }, { rumah_sakit: 'RS B', tahun: 2025 }],
   };
   assert.deepEqual(mergeFilters([s1, s2]), {
     kategori: ['TARIF IGD', 'TARIF LAB'],
@@ -103,6 +105,11 @@ test('mergeFilters unions and sorts like get_filters', () => {
     kelas_relations: [
       { kelas_kamar: 'Kelas 1', rumah_sakit: 'RS A' },
       { kelas_kamar: 'VIP', rumah_sakit: 'RS B' },
+    ],
+    rs_tahun: [
+      { rumah_sakit: 'RS A', tahun: 2025 },
+      { rumah_sakit: 'RS A', tahun: 2026 },
+      { rumah_sakit: 'RS B', tahun: 2025 },
     ],
   });
 });

@@ -273,6 +273,57 @@ begin
   using row_limit;
 end $$;
 
+-- --- RPC: price pairs for the Kenaikan Harga tab ----------------
+-- Compares each selected year with the next selected year, inside the same
+-- hospital. Only 100% identical items are paired: same rumah_sakit, layanan,
+-- kategori and raw kelas_kamar (an empty kelas_kamar only matches an empty
+-- one). Every name is unique in its reference table, so equal ids mean equal
+-- text; no fuzzy matching, no room_class_mapping. An item with several prices
+-- in one year counts once, at their average. Items with no price or price 0
+-- in the first year are skipped.
+-- Returns one JSON array (not rows, so PostgREST's row cap does not apply):
+--   [{rumah_sakit, tahun_awal, tahun_akhir, kategori_harga, awal: [..], akhir: [..]}]
+-- awal[i] / akhir[i] are the prices of one item; the API maps kategori_harga
+-- to the 5 kategori besar and computes the statistics.
+create or replace function kenaikan_tarif(f_rumah_sakit text[], f_tahun int[])
+returns jsonb language sql stable as $$
+  with rs as (
+    select rs.id, r.display_name
+    from rumah_sakit_ref rs join rumahsakit r on r.rumah_sakit = rs.nama
+    where r.display_name = any(f_rumah_sakit)
+  ), yrs as (     -- each selected year with the next selected year
+    select y as awal, lead(y) over (order by y) as akhir
+    from (select distinct unnest(f_tahun) as y) x
+  ), items as (   -- one price per exact item and year
+    select t.rumah_sakit_id, t.layanan_id, t.kategori_id,
+           coalesce(t.kelas_kamar_id, -1) as kelas, t.tahun,
+           round(avg(t.tarif), 2)::float8 as harga
+    from tarif_v2 t
+    where t.rumah_sakit_id = any(array(select id from rs))
+      and t.tahun = any(f_tahun)
+      and t.layanan_id is not null and t.kategori_id is not null and t.tarif is not null
+    group by 1, 2, 3, 4, 5
+  ), pairs as (
+    select rs.display_name as rumah_sakit, y.awal as tahun_awal, y.akhir as tahun_akhir,
+           k.nama as kategori_harga,
+           array_agg(a.harga order by a.layanan_id, a.kelas, a.rumah_sakit_id) as awal,
+           array_agg(b.harga order by a.layanan_id, a.kelas, a.rumah_sakit_id) as akhir
+    from yrs y
+    join items a on a.tahun = y.awal
+    join items b on b.tahun = y.akhir
+                and b.rumah_sakit_id = a.rumah_sakit_id
+                and b.layanan_id     = a.layanan_id
+                and b.kategori_id    = a.kategori_id
+                and b.kelas          = a.kelas
+    join rs on rs.id = a.rumah_sakit_id
+    join kategori_ref k on k.id = a.kategori_id
+    where a.harga > 0
+    group by 1, 2, 3, 4
+  )
+  select coalesce(jsonb_agg(to_jsonb(p) order by rumah_sakit, tahun_awal, kategori_harga), '[]')
+  from pairs p;
+$$;
+
 -- --- RPC: filters (all dropdown values + relations, as JSON) ----
 -- Computing these reads the whole table (seconds on 1.8M rows), and the
 -- website asks on every page load, so the result is stored in filters_cache
@@ -296,6 +347,12 @@ returns jsonb language sql stable as $$
     join rumah_sakit_ref rs         on rs.id = x.rumah_sakit_id
     join rumahsakit r               on r.rumah_sakit = rs.nama
     left join room_class_mapping rm on rm.room_class = kk.nama
+  ), rtahun as (  -- hospital x year pairs that have rows
+    select distinct r.display_name as rumah_sakit, x.tahun
+    from (select distinct rumah_sakit_id, tahun from tarif_v2
+          where layanan_id is not null and kategori_id is not null and tahun is not null) x
+    join rumah_sakit_ref rs on rs.id = x.rumah_sakit_id
+    join rumahsakit r       on r.rumah_sakit = rs.nama
   )
   select jsonb_build_object(
     'kategori',    (select coalesce(jsonb_agg(k.nama order by k.nama), '[]') from kategori_ref k
@@ -311,7 +368,10 @@ returns jsonb language sql stable as $$
     'relations',       (select coalesce(jsonb_agg(jsonb_build_object('kategori_harga', kategori_harga, 'rumah_sakit', rumah_sakit)
                                                   order by kategori_harga, rumah_sakit), '[]') from rel),
     'kelas_relations', (select coalesce(jsonb_agg(jsonb_build_object('kelas_kamar', kelas_kamar, 'rumah_sakit', rumah_sakit)
-                                                  order by kelas_kamar, rumah_sakit), '[]') from krel)
+                                                  order by kelas_kamar, rumah_sakit), '[]') from krel),
+    -- years per hospital, for the Kenaikan Harga tab (hospitals with 2+ years)
+    'rs_tahun',        (select coalesce(jsonb_agg(jsonb_build_object('rumah_sakit', rumah_sakit, 'tahun', tahun)
+                                                  order by rumah_sakit, tahun), '[]') from rtahun)
   );
 $$;
 

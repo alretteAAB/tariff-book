@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 
 // ─── MultiSelectDropdown ────────────────────────────────────────────
-export function MultiSelectDropdown({ label, options, selected, onChange, formatLabel }) {
+// isDisabled(option): opsi tampil abu-abu dan tidak bisa dicentang.
+// emptyLabel: teks tombol saat belum ada yang dipilih (default "Semua <label>").
+export function MultiSelectDropdown({ label, options, selected, onChange, formatLabel, isDisabled, emptyLabel }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef(null);
@@ -19,6 +21,8 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
     fmt(o).toLowerCase().includes(search.toLowerCase())
   );
 
+  const selectable = isDisabled ? filtered.filter(o => !isDisabled(o)) : filtered;
+
   const toggle = (val) => {
     onChange(selected.includes(val)
       ? selected.filter(v => v !== val)
@@ -26,7 +30,9 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
     );
   };
 
-  const triggerLabel = selected.length === 0 || selected.length === options.length
+  const triggerLabel = selected.length === 0
+    ? (emptyLabel ?? `Semua ${label}`)
+    : selected.length === options.length
     ? `Semua ${label}`
     : selected.length === 1
     ? fmt(selected[0]).replace('TARIF ', '')
@@ -60,7 +66,7 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
             </div>
           )}
           <div className="msd-actions">
-            <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange([...new Set([...selected, ...filtered])]); }}>
+            <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange([...new Set([...selected, ...selectable])]); }}>
               Pilih Semua
             </button>
             <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange(selected.filter(v => !filtered.includes(v))); }}>
@@ -71,11 +77,13 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
             {filtered.length === 0 && <div className="msd-empty">Tidak ditemukan</div>}
             {filtered.map(opt => {
               const isChecked = selected.includes(opt);
+              const disabled = isDisabled?.(opt) && !isChecked;
               return (
                 <div
                   key={String(opt)}
-                  className={`msd-item ${isChecked ? 'checked' : ''}`}
-                  onMouseDown={e => { e.preventDefault(); toggle(opt); }}
+                  className={`msd-item ${isChecked ? 'checked' : ''} ${disabled ? 'disabled' : ''}`}
+                  aria-disabled={disabled || undefined}
+                  onMouseDown={e => { e.preventDefault(); if (!disabled) toggle(opt); }}
                 >
                   <div className="msd-checkbox">
                     <span className="msd-checkmark">✓</span>

@@ -3,6 +3,7 @@ import { styles } from "./styles.js";
 import { scrollToTop, scrollToBottom } from "./lib/utils.jsx";
 import GolonganView from "./views/GolonganView.jsx";
 import TarifView from "./views/TarifView.jsx";
+import KenaikanView from "./views/KenaikanView.jsx";
 // by Aldo Oktavianus
 // data by Arfan Hafidt Nashrullah
 // idea Beatrice Marietta 
@@ -10,7 +11,7 @@ import TarifView from "./views/TarifView.jsx";
 // menyerahkan isi halaman ke view yang aktif. Tiap view memegang state-nya
 // sendiri — berpindah tab akan mengosongkannya, dan itu memang disengaja.
 export default function App() {
-  const [tab, setTab] = useState("tarif"); // halaman aktif: 'tarif' | 'golongan'
+  const [tab, setTab] = useState("tarif"); // halaman aktif: 'tarif' | 'golongan' | 'kenaikan'
 
   return (
     <>
@@ -35,10 +36,16 @@ export default function App() {
             >
               Golongan Operasi
             </button>
+            <button
+              className={`nav-tab ${tab === 'kenaikan' ? 'active' : ''}`}
+              onClick={() => setTab('kenaikan')}
+            >
+              Kenaikan Harga
+            </button>
           </nav>
         </header>
 
-        {tab === 'golongan' ? <GolonganView /> : <TarifView />}
+        {tab === 'golongan' ? <GolonganView /> : tab === 'kenaikan' ? <KenaikanView /> : <TarifView />}
 
         <div className="scroll-btns">
           <button className="scroll-btn" onClick={scrollToTop} title="Ke Atas">↑</button>

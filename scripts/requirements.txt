@@ -1,3 +1,4 @@
 supabase>=2.0
 pandas>=2.0
 truststore>=0.10
+openpyxl>=3.1
