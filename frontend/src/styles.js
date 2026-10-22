@@ -883,13 +883,31 @@ export const styles = `
     border-radius: var(--radius-sm); color: #8e2a1f;
   }
   .kn-stale { opacity: 0.55; transition: opacity 0.15s; }
-  .kn-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 12px; font-size: 12px; color: var(--text); }
-  .kn-legend-item { display: inline-flex; align-items: center; gap: 7px; }
-  .kn-swatch {
-    display: inline-block; width: 12px; height: 12px; border-radius: 3px;
-    margin-right: 7px; vertical-align: -1px; flex-shrink: 0;
+  .kn-section { margin-bottom: 30px; }
+  .kn-section-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .kn-section-title { font-size: 17px; font-weight: 700; color: var(--text); margin-right: 6px; }
+  .kn-empty {
+    background: var(--card); border: 1px dashed var(--border-mid); border-radius: var(--radius);
+    padding: 22px; text-align: center; font-size: 13px; color: var(--text-muted);
   }
-  .kn-legend-item .kn-swatch { margin-right: 0; }
+  .kn-empty .spinner { display: inline-block; }
+  .kn-kelas-table th, .kn-kelas-table td { padding: 10px 14px; }
+  .kn-kelas-table th { vertical-align: bottom; }
+  .kn-kelas-name { font-size: 11px; color: var(--text); letter-spacing: 0.6px; }
+  .kn-kelas-sub { font-size: 9px; font-weight: 500; letter-spacing: 0.4px; text-transform: none; color: var(--text-dim); margin-top: 2px; }
+  .kn-kelas-kat { font-weight: 600; white-space: nowrap; }
+  /* Kolom kategori tetap terlihat saat tabel digeser ke samping (HP) */
+  .kn-kelas-table th:first-child, .kn-kelas-table td:first-child {
+    position: sticky; left: 0; z-index: 1;
+    box-shadow: inset -1px 0 0 var(--border);
+  }
+  .kn-kelas-table th:first-child { background: var(--surface); }
+  .kn-kelas-table td:first-child { background: var(--card); }
+  .kn-cell { cursor: default; outline: none; }
+  .kn-cell:hover, .kn-cell:focus-visible { background: var(--gold-dim); box-shadow: inset 0 0 0 1px var(--border-mid); }
+  .kn-cell-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kn-cell-n { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+  .kn-cell-empty { color: var(--text-dim); }
   .kn-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 18px; margin-bottom: 22px; }
   .kn-panel {
     background: var(--card); border: 1px solid var(--border);

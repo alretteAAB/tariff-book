@@ -204,9 +204,14 @@ Browsers also keep the list for up to 5 minutes, so new hospitals can take
 that long to appear in the dropdown for someone who already had the page open.
 
 ### 3.4c The Kenaikan Harga tab
-It needs `kenaikan_tarif` and the `rs_tahun` list from `02_rpc.sql` +
-`04_security.sql` on every shard, then `select refresh_filters();` there.
-Until then the tab says the year list is not available.
+It needs `kenaikan_tarif`, `selisih_kelas_tarif` and the `rs_tahun` list from
+`02_rpc.sql` + `04_security.sql` on every shard, then `select refresh_filters();`
+there. Until then the tab says the year list is not available (or the class
+section shows an error if only `selisih_kelas_tarif` is missing).
+
+The tab shows one hospital: price increase between years (needs 2+ years) and
+the price difference between room classes in one year, each class against a
+base class (default: the one named like "Kelas II").
 
 The 5 kategori besar come from the Excel mapping, stored in the code as
 `frontend/functions/api/_kategori_besar.json`. To change the mapping:
