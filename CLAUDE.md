@@ -143,3 +143,14 @@ Cloudflare Pages build settings: root `frontend`, build command
   listed in its `SHARDS` var and `SHARD_n_KEY` secrets.
 - Statement timeouts on ~2M rows were fixed by the indexes in `01_schema.sql`.
   Keep them.
+- **Search speed:** `search_tarif` / `compare_rows_tarif` turn the keyword and
+  filters into id lists first (`tarif_where`) and read `tarif_v2` through its
+  indexes; never filter on the `tarif` view's text columns with `OR` (that
+  joins every row first). The total is counted separately; with <= 100k
+  matches the page is fetched with an `OFFSET 0` fence (fetch-then-sort),
+  above that the planner's ordered walk is faster.
+- **Filters are cached:** `get_filters()` returns `filters_cache` (filled by
+  `refresh_filters()`, which only postgres/service_role may run). The upload
+  and move scripts refresh it; after manual data changes run
+  `select refresh_filters();`. `/api/filters` sends `max-age=300`, and the
+  Tarif tab shows the last list from localStorage while fetching the new one.

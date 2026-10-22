@@ -15,7 +15,7 @@ declare
 begin
   foreach tbl in array array[
     'tarif_v2', 'rumah_sakit_ref', 'kategori_ref', 'kelas_kamar_ref',
-    'layanan_ref', 'rumahsakit', 'room_class_mapping'
+    'layanan_ref', 'rumahsakit', 'room_class_mapping', 'filters_cache'
   ] loop
     execute format('drop policy if exists %I on %I', 'public read ' || tbl, tbl);
     execute format('create policy %I on %I for select to anon using (true)', 'public read ' || tbl, tbl);
@@ -30,7 +30,12 @@ grant execute on function compare_rows_tarif  to anon;
 grant execute on function get_filters         to anon;
 grant execute on function shard_stats         to anon;
 
+-- refresh_filters rewrites the cache and reads the whole table: only the
+-- upload/move scripts (service_role) and the SQL Editor (postgres) run it.
+revoke execute on function refresh_filters from public, anon, authenticated;
+grant  execute on function refresh_filters to service_role;
+
 -- --- anon reads (Supabase grants these by default; explicit here so the
 -- RPCs never depend on that default) ------------------------------
 grant select on tarif_v2, rumah_sakit_ref, kategori_ref, kelas_kamar_ref,
-                layanan_ref, rumahsakit, room_class_mapping, tarif to anon;
+                layanan_ref, rumahsakit, room_class_mapping, tarif, filters_cache to anon;

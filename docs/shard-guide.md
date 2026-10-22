@@ -191,6 +191,18 @@ paused project, and check the keep-alive Worker logs.
 Edit the file in `sql/shard/`, then run it on **every** shard. If you re-run
 `02_rpc.sql`, always run `04_security.sql` right after it.
 
+### 3.4b The filter list is cached
+The dropdown lists (hospitals, categories, years, room classes) are stored in
+the `filters_cache` table of each shard instead of being recomputed from all
+rows on every page load. `upload_tarif.py` and `move-hospital.js` refresh it
+when they finish. If you change data any other way (SQL Editor, Table Editor,
+an old script), run this on that shard afterwards:
+```sql
+select refresh_filters();
+```
+Browsers also keep the list for up to 5 minutes, so new hospitals can take
+that long to appear in the dropdown for someone who already had the page open.
+
 ### 3.5 Known limits
 - Results that span several shards stop at **100 pages** (5,000 rows). Filter by
   hospital or year to see more; exports still go up to 50,000 rows.

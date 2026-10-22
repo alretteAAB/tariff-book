@@ -80,6 +80,13 @@ create index if not exists idx_tarif_v2_rs       on tarif_v2 (rumah_sakit_id);
 create index if not exists idx_tarif_v2_kategori on tarif_v2 (kategori_id);
 create index if not exists idx_tarif_v2_kelas    on tarif_v2 (kelas_kamar_id);
 
+-- --- Cache for get_filters() (filled by refresh_filters(), 02_rpc.sql) ---
+create table if not exists filters_cache (
+  id           int primary key default 1 check (id = 1),
+  data         jsonb not null,
+  refreshed_at timestamptz not null default now()
+);
+
 -- --- View: denormalized tarif over tarif_v2 + reference tables --
 create or replace view tarif as
   select t.id,

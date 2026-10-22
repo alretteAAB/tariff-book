@@ -194,7 +194,15 @@ async function main() {
       if (counts && args.delete) await deleteFromSource(src, dst, rsNama, counts);
     }
     await dst.query('analyze tarif_v2');
-    console.log('\nDone. The API picks up the new location within 5 minutes (filters cache).');
+    // The website's dropdowns come from filters_cache on each shard.
+    for (const [db, n] of [[src, args.from], [dst, args.to]]) {
+      try {
+        await db.query('select refresh_filters()');
+      } catch (err) {
+        console.warn(`Could not refresh filters on shard ${n} (${err.message}); run  select refresh_filters();  there.`);
+      }
+    }
+    console.log('\nDone. The API picks up the new location within 5 minutes (hospital map cache).');
     if (!args.delete) {
       console.log('Source rows were kept, so these hospitals now show up twice in the app.');
       console.log('Re-run the same command with --delete to finish the move.');
