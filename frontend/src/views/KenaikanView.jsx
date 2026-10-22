@@ -98,8 +98,12 @@ export default function KenaikanView() {
     if (!yearsByRS.has(rumah_sakit)) yearsByRS.set(rumah_sakit, []);
     yearsByRS.get(rumah_sakit).push(Number(tahun));
   }
-  const rsOptions = filters?.rumah_sakit ?? [];
-  const eligible = rsOptions.filter(rs => (yearsByRS.get(rs)?.length ?? 0) >= 2);
+  // RS yang bisa dipilih (2+ tahun) di atas, RS dengan 1 tahun di bawahnya;
+  // tiap kelompok tetap urut abjad.
+  const allRS = filters?.rumah_sakit ?? [];
+  const hasYears = (rs) => (yearsByRS.get(rs)?.length ?? 0) >= 2;
+  const eligible = allRS.filter(hasYears);
+  const rsOptions = [...eligible, ...allRS.filter(rs => !hasYears(rs))];
 
   const defaultList = eligible.slice(0, 4);
   const selected = rsSel ?? { list: defaultList, colors: assignColors(defaultList) };
@@ -145,8 +149,8 @@ export default function KenaikanView() {
               options={rsOptions}
               selected={selected.list}
               onChange={changeRS}
-              isDisabled={rs => (yearsByRS.get(rs)?.length ?? 0) < 2 || selected.list.length >= MAX_RS}
-              formatLabel={rs => (yearsByRS.get(rs)?.length ?? 0) < 2 ? `${rs} — hanya 1 tahun data` : rs}
+              isDisabled={rs => !hasYears(rs) || selected.list.length >= MAX_RS}
+              formatLabel={rs => hasYears(rs) ? rs : `${rs} — hanya 1 tahun data`}
             />
             <MultiSelectDropdown
               label="Tahun"
