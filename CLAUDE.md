@@ -35,7 +35,6 @@ scripts/upload_tarif.py       CSV upload; picks the shard per hospital (SHARD_n_
 scripts/move-hospital.js      move hospitals between shards (needs DATABASE_URL_n)
 sql/golongan/     01_schema → 02_rpc → 03_security  (golongan operasi project)
 scripts/upload_golongan.py    CSV upload of golongan operasi (GOLONGAN_SERVICE_KEY)
-data/golongan_operasi*.csv    source CSVs of the golongan data (initial upload)
 workers/keepalive/            cron Worker: daily shard_stats() ping per shard
 docs/shard-guide.md           how-to for humans: new shard, uploading, moving, limits
 ```
@@ -111,7 +110,7 @@ cd frontend && npm test                       # merge helper unit tests
 cd frontend && npx wrangler pages functions build --outdir /tmp/fn   # check Functions bundle
 cd scripts && pip install -r requirements.txt && python upload_tarif.py data.csv --dry-run
 cd scripts && npm install && node move-hospital.js --from 1 --to 2 --rs "Nama RS" [--delete]
-cd scripts && python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv --dry-run
+cd scripts && python upload_golongan.py buku_golongan.csv --dry-run
 cd workers/keepalive && npx wrangler secret put SHARD_1_KEY && npx wrangler deploy
 ```
 
@@ -144,3 +143,14 @@ Cloudflare Pages build settings: root `frontend`, build command
   listed in its `SHARDS` var and `SHARD_n_KEY` secrets.
 - Statement timeouts on ~2M rows were fixed by the indexes in `01_schema.sql`.
   Keep them.
+- **Search speed:** `search_tarif` / `compare_rows_tarif` turn the keyword and
+  filters into id lists first (`tarif_where`) and read `tarif_v2` through its
+  indexes; never filter on the `tarif` view's text columns with `OR` (that
+  joins every row first). The total is counted separately; with <= 100k
+  matches the page is fetched with an `OFFSET 0` fence (fetch-then-sort),
+  above that the planner's ordered walk is faster.
+- **Filters are cached:** `get_filters()` returns `filters_cache` (filled by
+  `refresh_filters()`, which only postgres/service_role may run). The upload
+  and move scripts refresh it; after manual data changes run
+  `select refresh_filters();`. `/api/filters` sends `max-age=300`, and the
+  Tarif tab shows the last list from localStorage while fetching the new one.

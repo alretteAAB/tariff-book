@@ -1,8 +1,8 @@
 """Upload data golongan operasi (CSV) ke project Supabase golongan.
 
     cd scripts
-    python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv --dry-run
-    python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv
+    python upload_golongan.py buku_golongan_rs_a.csv [buku_golongan_rs_b.csv ...] --dry-run
+    python upload_golongan.py buku_golongan_rs_a.csv [buku_golongan_rs_b.csv ...]
 
 Kolom CSV: rumah_sakit, specialty, golongan, nama_layanan, dan service_code
 (opsional; buku yang tidak punya kode boleh tanpa kolom ini).

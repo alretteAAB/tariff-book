@@ -240,6 +240,17 @@ def main() -> None:
             print(f"  shard {sid}  {counts.get(rs, 0):>7}  {rs}")
         print(f"  shard {sid} ukuran: {s['db_size']}")
 
+    # Dropdown filter website dibaca dari filters_cache; hitung ulang supaya
+    # data baru (RS, kategori, kelas, tahun) langsung muncul.
+    print("\nMemperbarui daftar filter...")
+    for sid in sorted(set(plan.values())):
+        try:
+            clients[sid].rpc("refresh_filters").execute()
+            print(f"  shard {sid}: ok")
+        except Exception as err:  # data sudah masuk; hanya filternya yang tertinggal
+            print(f"  shard {sid}: GAGAL ({err}).\n"
+                  f"  Jalankan  select refresh_filters();  di SQL Editor shard {sid}.")
+
 
 if __name__ == "__main__":
     main()

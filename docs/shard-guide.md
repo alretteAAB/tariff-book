@@ -191,6 +191,18 @@ paused project, and check the keep-alive Worker logs.
 Edit the file in `sql/shard/`, then run it on **every** shard. If you re-run
 `02_rpc.sql`, always run `04_security.sql` right after it.
 
+### 3.4b The filter list is cached
+The dropdown lists (hospitals, categories, years, room classes) are stored in
+the `filters_cache` table of each shard instead of being recomputed from all
+rows on every page load. `upload_tarif.py` and `move-hospital.js` refresh it
+when they finish. If you change data any other way (SQL Editor, Table Editor,
+an old script), run this on that shard afterwards:
+```sql
+select refresh_filters();
+```
+Browsers also keep the list for up to 5 minutes, so new hospitals can take
+that long to appear in the dropdown for someone who already had the page open.
+
 ### 3.5 Known limits
 - Results that span several shards stop at **100 pages** (5,000 rows). Filter by
   hospital or year to see more; exports still go up to 50,000 rows.
@@ -223,13 +235,15 @@ it is not in `SHARDS`, and the hospital rules above do not apply to it.
    GOLONGAN_URL=https://xxxx.supabase.co
    GOLONGAN_SERVICE_KEY=eyJ...      (service_role, tab Legacy)
    ```
-4. Upload the existing data (the two CSVs in `data/`):
+4. Upload the golongan CSVs (format in 4.2). The original two books
+   (Mitra Keluarga Bekasi Timur, 2198 rows; Grand Wisata, 1332 rows) were
+   uploaded on 2026-10-20; their CSVs are no longer in the repo (in git
+   history before that date, and kept outside the repo as a backup).
    ```bash
    cd scripts
-   python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv --dry-run
-   python upload_golongan.py ../data/golongan_operasi.csv ../data/golongan_operasi_grand_wisata.csv
+   python upload_golongan.py buku_golongan_rs_a.csv buku_golongan_rs_b.csv --dry-run
+   python upload_golongan.py buku_golongan_rs_a.csv buku_golongan_rs_b.csv
    ```
-   Expected at the end: 2198 Mitra Keluarga Bekasi Timur, 1332 Mitra Keluarga Grand Wisata.
 5. Cloudflare Pages → Settings → Variables and Secrets, **Preview and
    Production**: `GOLONGAN_URL` = the project URL, `GOLONGAN_KEY` = its
    publishable (or legacy anon) key. Then **Retry deployment**.

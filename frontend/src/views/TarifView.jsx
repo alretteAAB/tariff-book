@@ -7,6 +7,21 @@ import { SortPanel } from "../components/SortPanel.jsx";
 import { SortableTh } from "../components/SortableTh.jsx";
 import CompareView from "./CompareView.jsx";
 
+// Daftar filter terakhir disimpan di browser, supaya dropdown langsung terisi
+// saat halaman dibuka; versi terbaru tetap diambil di belakang layar.
+const FILTERS_STORAGE_KEY = "tarif-filters-v1";
+const readStoredFilters = () => {
+  try {
+    const f = JSON.parse(localStorage.getItem(FILTERS_STORAGE_KEY));
+    return f && Array.isArray(f.kategori) && Array.isArray(f.relations) ? f : null;
+  } catch {
+    return null;
+  }
+};
+const storeFilters = (f) => {
+  try { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(f)); } catch { /* storage full or blocked */ }
+};
+
 // Kolom yang bisa diurutkan (urutannya mengikuti urutan kolom tabel).
 // `numeric` menentukan arah default saat kolom pertama kali dipilih.
 const SORT_FIELDS = [
@@ -30,7 +45,8 @@ const serializeSort = (keys) => keys.map(k => `${k.col}:${k.dir}`).join(',');
 // saran ketik, urutan bertingkat, ekspor, dan matriks perbandingan.
 export default function TarifView() {
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState({ kategori: [], rumah_sakit: [], tahun: [], kelas_kamar: [], relations: [], kelas_relations: [] });
+  const [storedFilters] = useState(readStoredFilters);
+  const [filters, setFilters] = useState(storedFilters ?? { kategori: [], rumah_sakit: [], tahun: [], kelas_kamar: [], relations: [], kelas_relations: [] });
   const [selectedKategori, setSelectedKategori] = useState([]);
   const [selectedRS, setSelectedRS] = useState([]);
   const [selectedTahun, setSelectedTahun] = useState([]);
@@ -43,7 +59,7 @@ export default function TarifView() {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState(null);
   const [sortKeys, setSortKeys] = useState(DEFAULT_SORT);
-  const [filtersLoading, setFiltersLoading] = useState(true);
+  const [filtersLoading, setFiltersLoading] = useState(!storedFilters);
   const [filtersError, setFiltersError] = useState(false);
   const [dots, setDots] = useState(1);
   const [showGuidance, setShowGuidance] = useState(true);
@@ -74,22 +90,31 @@ export default function TarifView() {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  // Daftar isi dropdown datang dari /api/filters — payloadnya besar (~450 KB) dan
-  // bisa makan beberapa detik, jadi statusnya ditampilkan, bukan didiamkan.
-  const loadFilters = useCallback(() => {
-    setFiltersLoading(true);
-    setFiltersError(false);
+  // Daftar isi dropdown datang dari /api/filters (payload ~450 KB). Saat belum
+  // ada salinan di browser, statusnya ditampilkan; kalau sudah ada, salinan itu
+  // dipakai dulu dan diganti diam-diam begitu versi terbaru tiba.
+  const fetchFilters = useCallback((hasCopy) => {
     fetch(`${API}/filters`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then(setFilters)
-      .catch(err => { console.error(err); setFiltersError(true); })
+      .then(f => {
+        if (f.error) throw new Error(f.error);
+        setFilters(f);
+        storeFilters(f);
+      })
+      .catch(err => { console.error(err); if (!hasCopy) setFiltersError(true); })
       .finally(() => setFiltersLoading(false));
   }, []);
 
-  useEffect(() => { loadFilters(); }, [loadFilters]);
+  const loadFilters = () => {
+    setFiltersLoading(true);
+    setFiltersError(false);
+    fetchFilters(false);
+  };
+
+  useEffect(() => { fetchFilters(Boolean(storedFilters)); }, [fetchFilters, storedFilters]);
 
   // Titik berjalan: . → .. → ... → .... → ulang. Hanya hidup selama memuat.
   useEffect(() => {
