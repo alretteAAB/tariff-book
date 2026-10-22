@@ -28,6 +28,7 @@ grant execute on function search_tarif        to anon;
 grant execute on function suggest_tarif       to anon;
 grant execute on function compare_rows_tarif  to anon;
 grant execute on function get_filters         to anon;
+grant execute on function kenaikan_tarif      to anon;
 grant execute on function shard_stats         to anon;
 
 -- refresh_filters rewrites the cache and reads the whole table: only the

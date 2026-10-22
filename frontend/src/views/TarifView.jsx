@@ -1,26 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { API, highlight, formatRupiah, scrollToTop } from "../lib/utils.jsx";
+import { API, highlight, formatRupiah, scrollToTop, readStoredFilters, storeFilters } from "../lib/utils.jsx";
 import { InfoTip } from "../components/InfoTip.jsx";
 import { MultiSelectDropdown } from "../components/MultiSelectDropdown.jsx";
 import { Pagination } from "../components/Pagination.jsx";
 import { SortPanel } from "../components/SortPanel.jsx";
 import { SortableTh } from "../components/SortableTh.jsx";
 import CompareView from "./CompareView.jsx";
-
-// Daftar filter terakhir disimpan di browser, supaya dropdown langsung terisi
-// saat halaman dibuka; versi terbaru tetap diambil di belakang layar.
-const FILTERS_STORAGE_KEY = "tarif-filters-v1";
-const readStoredFilters = () => {
-  try {
-    const f = JSON.parse(localStorage.getItem(FILTERS_STORAGE_KEY));
-    return f && Array.isArray(f.kategori) && Array.isArray(f.relations) ? f : null;
-  } catch {
-    return null;
-  }
-};
-const storeFilters = (f) => {
-  try { localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(f)); } catch { /* storage full or blocked */ }
-};
 
 // Kolom yang bisa diurutkan (urutannya mengikuti urutan kolom tabel).
 // `numeric` menentukan arah default saat kolom pertama kali dipilih.

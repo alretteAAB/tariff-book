@@ -94,6 +94,7 @@ export function mergeFilters(list) {
     kelas_kamar:     uniqueSorted(pick('kelas_kamar').flat(), compareText),
     relations:       uniqueObjects(pick('relations'), 'kategori_harga', 'rumah_sakit'),
     kelas_relations: uniqueObjects(pick('kelas_relations'), 'kelas_kamar', 'rumah_sakit'),
+    rs_tahun:        uniqueObjects(pick('rs_tahun'), 'rumah_sakit', 'tahun'),
   };
 }
 

@@ -203,6 +203,21 @@ select refresh_filters();
 Browsers also keep the list for up to 5 minutes, so new hospitals can take
 that long to appear in the dropdown for someone who already had the page open.
 
+### 3.4c The Kenaikan Harga tab
+It needs `kenaikan_tarif` and the `rs_tahun` list from `02_rpc.sql` +
+`04_security.sql` on every shard, then `select refresh_filters();` there.
+Until then the tab says the year list is not available.
+
+The 5 kategori besar come from the Excel mapping, stored in the code as
+`frontend/functions/api/_kategori_besar.json`. To change the mapping:
+```bash
+cd scripts && pip install -r requirements.txt
+python build_kategori_besar.py mapping_kategori_besar.xlsx
+```
+then commit the JSON and deploy. Names must match `kategori_harga` exactly
+(spaces and capitals count); categories not in the file are left out of the
+dashboard and shown as "Tidak termasuk 5 kategori".
+
 ### 3.5 Known limits
 - Results that span several shards stop at **100 pages** (5,000 rows). Filter by
   hospital or year to see more; exports still go up to 50,000 rows.

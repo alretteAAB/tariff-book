@@ -24,10 +24,12 @@ frontend/functions/api/
   _supabase.js   parseMulti(), json()                       (no route)
   _shards.js     shard registry, hospital→shard map, fan-out (no route)
   _merge.js      pure merge helpers: sort comparator, suggest/filters merge
-  filters.js  search.js  suggest.js  export.js  compare.js   → /api/<name>
+  filters.js  search.js  suggest.js  export.js  compare.js  kenaikan.js   → /api/<name>
+  _kenaikan.js   pure stats for /api/kenaikan (median, mean, weighted, quartiles)
+  _kategori_besar.json  kategori_harga → 5 kategori besar (generated, see below)
   _golongan.js   client for the golongan project (GOLONGAN_URL / GOLONGAN_KEY)
   golongan/index.js  golongan/filters.js   → /api/golongan, /api/golongan/filters
-frontend/test/merge.test.js   npm test (node --test)
+frontend/test/*.test.js       npm test (node --test)
 sql/shard/        01_schema → 02_rpc → 03_shard_stats → 04_security (run in order)
                   05_strict_unique: one-off for shards created before it (01 has it built in)
 sql/shard/runbook-reclaim-space.md
@@ -35,6 +37,7 @@ scripts/upload_tarif.py       CSV upload; picks the shard per hospital (SHARD_n_
 scripts/move-hospital.js      move hospitals between shards (needs DATABASE_URL_n)
 sql/golongan/     01_schema → 02_rpc → 03_security  (golongan operasi project)
 scripts/upload_golongan.py    CSV upload of golongan operasi (GOLONGAN_SERVICE_KEY)
+scripts/build_kategori_besar.py  Excel (sheet Mapping) → _kategori_besar.json
 workers/keepalive/            cron Worker: daily shard_stats() ping per shard
 docs/shard-guide.md           how-to for humans: new shard, uploading, moving, limits
 ```
@@ -50,8 +53,8 @@ back to text columns; all RPCs read the view. `rumahsakit` holds
 
 RPCs (args must match exactly): `search_tarif(q, f_kategori, f_rumah_sakit,
 f_tahun, f_kelas, sort, page, page_size)`, `suggest_tarif(q, f_*)` (returns
-`score` too), `compare_rows_tarif(q, f_*, row_limit)`, `get_filters()`,
-`shard_stats()`.
+`score` too), `compare_rows_tarif(q, f_*, row_limit)`, `kenaikan_tarif(f_rumah_sakit,
+f_tahun)` (returns one jsonb array), `get_filters()`, `shard_stats()`.
 
 **`sql/shard/*.sql` is the source of truth.** Change SQL there first, then run
 it on every shard. Re-running `02_rpc.sql` drops/recreates `suggest_tarif`, so
@@ -86,6 +89,22 @@ How the router behaves (`_shards.js`):
 - A failing shard does not fail the request: JSON gets `partial: true,
   failedShards: [...]`, exports get header `x-partial-shards`. All shards
   failing → 500.
+
+## Kenaikan Harga tab
+
+`/api/kenaikan?rumah_sakit=..&tahun=..` → `kenaikan_tarif` per shard: each
+selected year vs the next selected year, within one hospital, pairing only
+**100% identical items** (same `rumah_sakit_id`, `layanan_id`, `kategori_id`,
+raw `kelas_kamar_id`; empty only matches empty; no fuzzy match, no
+`room_class_mapping`). Several prices of one item in a year → their average;
+price 0 in the first year → skipped. It returns the price pairs per
+`kategori_harga`; the Function maps them to the 5 kategori besar with
+`_kategori_besar.json` (exact name match) and computes median, mean,
+price-weighted mean, Q1/Q3, min/max, n and up/same/down. Categories not in the
+mapping are only counted (`unmapped`). Hospitals and their years come from
+`get_filters().rs_tahun`; hospitals with < 2 years show but can't be picked.
+New mapping: `python scripts/build_kategori_besar.py mapping.xlsx`, commit,
+deploy.
 
 ## Golongan operasi project
 
