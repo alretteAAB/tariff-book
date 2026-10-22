@@ -24,8 +24,8 @@ frontend/functions/api/
   _supabase.js   parseMulti(), json()                       (no route)
   _shards.js     shard registry, hospital→shard map, fan-out (no route)
   _merge.js      pure merge helpers: sort comparator, suggest/filters merge
-  filters.js  search.js  suggest.js  export.js  compare.js  kenaikan.js   → /api/<name>
-  _kenaikan.js   pure stats for /api/kenaikan (median, mean, weighted, quartiles)
+  filters.js  search.js  suggest.js  export.js  compare.js  kenaikan.js  selisih-kelas.js   → /api/<name>
+  _kenaikan.js   pure stats for /api/kenaikan and /api/selisih-kelas (median, mean, weighted, quartiles)
   _kategori_besar.json  kategori_harga → 5 kategori besar (generated, see below)
   _golongan.js   client for the golongan project (GOLONGAN_URL / GOLONGAN_KEY)
   golongan/index.js  golongan/filters.js   → /api/golongan, /api/golongan/filters
@@ -54,7 +54,9 @@ back to text columns; all RPCs read the view. `rumahsakit` holds
 RPCs (args must match exactly): `search_tarif(q, f_kategori, f_rumah_sakit,
 f_tahun, f_kelas, sort, page, page_size)`, `suggest_tarif(q, f_*)` (returns
 `score` too), `compare_rows_tarif(q, f_*, row_limit)`, `kenaikan_tarif(f_rumah_sakit,
-f_tahun)` (returns one jsonb array), `get_filters()`, `shard_stats()`.
+f_tahun)` (returns one jsonb array), `selisih_kelas_tarif(f_rumah_sakit text,
+f_tahun int, f_kelas text)` (returns one jsonb object), `get_filters()`,
+`shard_stats()`.
 
 **`sql/shard/*.sql` is the source of truth.** Change SQL there first, then run
 it on every shard. Re-running `02_rpc.sql` drops/recreates `suggest_tarif`, so
@@ -92,7 +94,10 @@ How the router behaves (`_shards.js`):
 
 ## Kenaikan Harga tab
 
-`/api/kenaikan?rumah_sakit=..&tahun=..` → `kenaikan_tarif` per shard: each
+One hospital at a time (any hospital; the year section needs 2+ years). Two
+sections, both pairing only **100% identical items**:
+
+**Antar tahun.** `/api/kenaikan?rumah_sakit=..&tahun=..` → `kenaikan_tarif` per shard: each
 selected year vs the next selected year, within one hospital, pairing only
 **100% identical items** (same `rumah_sakit_id`, `layanan_id`, `kategori_id`,
 raw `kelas_kamar_id`; empty only matches empty; no fuzzy match, no
@@ -102,7 +107,17 @@ price 0 in the first year → skipped. It returns the price pairs per
 `_kategori_besar.json` (exact name match) and computes median, mean,
 price-weighted mean, Q1/Q3, min/max, n and up/same/down. Categories not in the
 mapping are only counted (`unmapped`). Hospitals and their years come from
-`get_filters().rs_tahun`; hospitals with < 2 years show but can't be picked.
+`get_filters().rs_tahun`.
+
+**Antar kelas kamar.** `/api/selisih-kelas?rumah_sakit=..&tahun=..[&kelas=..]`
+→ `selisih_kelas_tarif`: one year, every room class vs a base class, pairing
+items with the same `rumah_sakit_id`, `layanan_id`, `kategori_id` (raw class
+names, rows without a class left out; several prices → average; base price 0
+skipped). Base class: `kelas` if that hospital has it that year, else the
+class matching `^(kelas|kls)\.?\s*(ii|2)(?![i0-9])` (Kelas II / KELAS 2 /
+Kls. II A, not Kelas III), else the class with most items. `buildSelisihKelas`
+orders the columns by overall median difference (cheapest first).
+
 New mapping: `python scripts/build_kategori_besar.py mapping.xlsx`, commit,
 deploy.
 

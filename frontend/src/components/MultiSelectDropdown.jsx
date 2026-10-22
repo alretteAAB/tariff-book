@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from "react";
 // ─── MultiSelectDropdown ────────────────────────────────────────────
 // isDisabled(option): opsi tampil abu-abu dan tidak bisa dicentang.
 // emptyLabel: teks tombol saat belum ada yang dipilih (default "Semua <label>").
-export function MultiSelectDropdown({ label, options, selected, onChange, formatLabel, isDisabled, emptyLabel }) {
+// single: hanya satu pilihan; klik langsung mengganti pilihan dan menutup menu.
+export function MultiSelectDropdown({ label, options, selected, onChange, formatLabel, isDisabled, emptyLabel, single }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef(null);
@@ -24,6 +25,11 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
   const selectable = isDisabled ? filtered.filter(o => !isDisabled(o)) : filtered;
 
   const toggle = (val) => {
+    if (single) {
+      onChange([val]);
+      setOpen(false);
+      return;
+    }
     onChange(selected.includes(val)
       ? selected.filter(v => v !== val)
       : [...selected, val]
@@ -32,20 +38,24 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
 
   const triggerLabel = selected.length === 0
     ? (emptyLabel ?? `Semua ${label}`)
+    : single
+    ? fmt(selected[0])
     : selected.length === options.length
     ? `Semua ${label}`
     : selected.length === 1
     ? fmt(selected[0]).replace('TARIF ', '')
     : `${label}`;
 
+  const partial = selected.length > 0 && (single || selected.length < options.length);
+
   return (
     <div className="msd-wrap" ref={ref}>
       <div
-        className={`msd-trigger ${open ? 'open' : ''} ${selected.length > 0 && selected.length < options.length ? 'has-selection' : ''}`}
+        className={`msd-trigger ${open ? 'open' : ''} ${partial ? 'has-selection' : ''}`}
         onClick={() => setOpen(v => !v)}
       >
         <span className="msd-label">{triggerLabel}</span>
-        {selected.length > 0 && selected.length < options.length && (
+        {partial && !single && (
           <span className="msd-badge">{selected.length}</span>
         )}
         <span className="msd-arrow">▾</span>
@@ -65,14 +75,14 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
               />
             </div>
           )}
-          <div className="msd-actions">
+          {!single && <div className="msd-actions">
             <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange([...new Set([...selected, ...selectable])]); }}>
               Pilih Semua
             </button>
             <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange(selected.filter(v => !filtered.includes(v))); }}>
               Hapus Semua
             </button>
-          </div>
+          </div>}
           <div className="msd-list">
             {filtered.length === 0 && <div className="msd-empty">Tidak ditemukan</div>}
             {filtered.map(opt => {

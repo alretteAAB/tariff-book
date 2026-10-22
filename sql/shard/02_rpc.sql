@@ -324,6 +324,65 @@ returns jsonb language sql stable as $$
   from pairs p;
 $$;
 
+-- --- RPC: price pairs between room classes (Kenaikan Harga tab) ----
+-- One hospital (display name), one year. Compares the base room class with
+-- every other room class of that hospital, pairing only items that are
+-- identical except for the class: same rumah_sakit, layanan and kategori
+-- (ids, so 100% equal text). Raw kelas_kamar names, no room_class_mapping;
+-- rows without a class are left out. Several prices of one item in one class
+-- count once, at their average; a base price of 0 is skipped.
+-- Base class: f_kelas when it exists for that hospital and year, otherwise
+-- the class named like "Kelas II" / "Kelas 2" / "Kls. II A" (not "Kelas III",
+-- "Kelas 20"), otherwise the class with the most items. Ties: most items.
+-- Returns one JSON object:
+--   { kelas_dasar, kelas: [{kelas, n}], pairs: [{kategori_harga, kelas, dasar: [..], harga: [..]}] }
+create or replace function selisih_kelas_tarif(f_rumah_sakit text, f_tahun int, f_kelas text default null)
+returns jsonb language sql stable as $$
+  with rs as (
+    select rs.id
+    from rumah_sakit_ref rs join rumahsakit r on r.rumah_sakit = rs.nama
+    where r.display_name = f_rumah_sakit
+  ), items as (   -- one price per exact item and class
+    select t.rumah_sakit_id, t.layanan_id, t.kategori_id, t.kelas_kamar_id as kelas_id,
+           round(avg(t.tarif), 2)::float8 as harga
+    from tarif_v2 t
+    where t.rumah_sakit_id = any(array(select id from rs))
+      and t.tahun = f_tahun
+      and t.layanan_id is not null and t.kategori_id is not null
+      and t.kelas_kamar_id is not null and t.tarif is not null
+    group by 1, 2, 3, 4
+  ), kelas as (
+    select kk.id, kk.nama, count(*) as n
+    from items i join kelas_kamar_ref kk on kk.id = i.kelas_id
+    group by 1, 2
+  ), dasar as (
+    select id, nama from kelas
+    order by coalesce(nama = f_kelas, false) desc,
+             (nama ~* '^\s*(kelas|kls)\.?\s*(ii|2)(?![i0-9])') desc,
+             n desc, nama
+    limit 1
+  ), pairs as (
+    select k.nama as kategori_harga, kk.nama as kelas,
+           array_agg(a.harga order by a.layanan_id, a.rumah_sakit_id) as dasar,
+           array_agg(b.harga order by a.layanan_id, a.rumah_sakit_id) as harga
+    from items a
+    join dasar d on d.id = a.kelas_id
+    join items b on b.rumah_sakit_id = a.rumah_sakit_id
+                and b.layanan_id     = a.layanan_id
+                and b.kategori_id    = a.kategori_id
+                and b.kelas_id      <> a.kelas_id
+    join kategori_ref k     on k.id  = a.kategori_id
+    join kelas_kamar_ref kk on kk.id = b.kelas_id
+    where a.harga > 0
+    group by 1, 2
+  )
+  select jsonb_build_object(
+    'kelas_dasar', (select nama from dasar),
+    'kelas', (select coalesce(jsonb_agg(jsonb_build_object('kelas', nama, 'n', n) order by nama), '[]') from kelas),
+    'pairs', (select coalesce(jsonb_agg(to_jsonb(p) order by kategori_harga, kelas), '[]') from pairs p)
+  );
+$$;
+
 -- --- RPC: filters (all dropdown values + relations, as JSON) ----
 -- Computing these reads the whole table (seconds on 1.8M rows), and the
 -- website asks on every page load, so the result is stored in filters_cache
