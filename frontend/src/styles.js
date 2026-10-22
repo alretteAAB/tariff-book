@@ -928,7 +928,7 @@ export const styles = `
   }
   .kn-panel-note { margin-top: 10px; font-size: 11px; color: var(--text-muted); }
   .kn-tip {
-    position: fixed; z-index: 1000; width: 240px; pointer-events: none;
+    position: fixed; z-index: 1000; width: 240px; max-width: calc(100vw - 16px); pointer-events: none;
     background: var(--card); border: 1px solid var(--border-mid);
     border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
     padding: 10px 12px; font-size: 12px; color: var(--text);
@@ -940,11 +940,17 @@ export const styles = `
   .kn-tip-table td { padding: 2px 0; color: var(--text-muted); }
   .kn-tip-table td:last-child { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
   .kn-tip-table tr { border: none; }
-  .kn-tip-table tr.active td { font-weight: 700; color: var(--text); }
+  .kn-tip-table tr.active td { font-weight: 700; }
+  .kn-tip-table tr.active td:first-child { color: var(--text); }
+  .kn-tip-table tr.kn-tip-sep td { border-top: 1px solid var(--border); padding-top: 5px; }
+  /* Naik = merah, turun = hijau (teks saja; tanda +/− tetap ada) */
+  .kn-up, .kn-tip-table td.kn-up { color: #b42318; }
+  .kn-down, .kn-tip-table td.kn-down { color: #157a3c; }
   .kn-table-title {
     font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;
     color: var(--gold); margin-bottom: 10px;
   }
+  .kn-table th, .kn-table td { padding: 10px 10px; }
   .kn-table td { font-size: 12px; white-space: nowrap; }
   .kn-table td.right { text-align: right; font-variant-numeric: tabular-nums; }
   .kn-unmapped { margin-top: 10px; font-size: 11px; color: var(--text-muted); line-height: 1.6; }

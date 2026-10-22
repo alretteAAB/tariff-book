@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { API, readStoredFilters, storeFilters } from "../lib/utils.jsx";
 import { InfoTip } from "../components/InfoTip.jsx";
 import { MultiSelectDropdown } from "../components/MultiSelectDropdown.jsx";
@@ -28,6 +29,11 @@ const MAX_RS = PALETTE.length;
 const fmtPct = (v) => v == null ? '–'
   : `${v > 0 ? '+' : ''}${v.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 const fmtInt = (v) => Number(v).toLocaleString('id-ID');
+// "18 (64%)": jumlah item dan porsinya dari n
+const fmtShare = (count, n) =>
+  `${fmtInt(count)} (${(n ? count / n : 0).toLocaleString('id-ID', { style: 'percent', maximumFractionDigits: 0 })})`;
+// Warna teks angka: naik (harga lebih mahal) merah, turun hijau. Batang tidak diwarnai.
+const trendClass = (v) => (v > 0 ? 'kn-up' : v < 0 ? 'kn-down' : '');
 
 // Memberi slot warna yang masih kosong ke RS yang baru dipilih.
 function assignColors(list, prev = {}) {
@@ -98,8 +104,12 @@ export default function KenaikanView() {
     if (!yearsByRS.has(rumah_sakit)) yearsByRS.set(rumah_sakit, []);
     yearsByRS.get(rumah_sakit).push(Number(tahun));
   }
-  const rsOptions = filters?.rumah_sakit ?? [];
-  const eligible = rsOptions.filter(rs => (yearsByRS.get(rs)?.length ?? 0) >= 2);
+  // RS yang bisa dipilih (2+ tahun) di atas, RS dengan 1 tahun di bawahnya;
+  // tiap kelompok tetap urut abjad.
+  const allRS = filters?.rumah_sakit ?? [];
+  const hasYears = (rs) => (yearsByRS.get(rs)?.length ?? 0) >= 2;
+  const eligible = allRS.filter(hasYears);
+  const rsOptions = [...eligible, ...allRS.filter(rs => !hasYears(rs))];
 
   const defaultList = eligible.slice(0, 4);
   const selected = rsSel ?? { list: defaultList, colors: assignColors(defaultList) };
@@ -145,8 +155,8 @@ export default function KenaikanView() {
               options={rsOptions}
               selected={selected.list}
               onChange={changeRS}
-              isDisabled={rs => (yearsByRS.get(rs)?.length ?? 0) < 2 || selected.list.length >= MAX_RS}
-              formatLabel={rs => (yearsByRS.get(rs)?.length ?? 0) < 2 ? `${rs} — hanya 1 tahun data` : rs}
+              isDisabled={rs => !hasYears(rs) || selected.list.length >= MAX_RS}
+              formatLabel={rs => hasYears(rs) ? rs : `${rs} — hanya 1 tahun data`}
             />
             <MultiSelectDropdown
               label="Tahun"
@@ -188,6 +198,7 @@ export default function KenaikanView() {
           <b>{statInfo.label}</b>: {statInfo.desc}.{' '}
           Hanya item yang <b>sama persis</b> di kedua tahun yang dibandingkan: rumah sakit, nama
           layanan, kategori, dan kelas kamar harus identik (beda spasi atau huruf pun dianggap item lain).
+          Angka <span className="kn-up">merah = naik</span>, <span className="kn-down">hijau = turun</span>.
           <InfoTip label="Cara hitung">
             % kenaikan per item = (harga tahun akhir − harga tahun awal) ÷ harga tahun awal.
             Item dengan beberapa harga dalam satu tahun memakai rata-ratanya; item berharga 0 di
@@ -328,7 +339,7 @@ function Charts({ data, list, colors, stat, setTip }) {
                               onBlur={hideTip}
                             />
                             <span
-                              className="kn-value"
+                              className={`kn-value ${trendClass(v)}`}
                               style={v < 0
                                 ? { right: `calc(${100 - pos(v)}% + 5px)` }
                                 : { left: `calc(${pos(v)}% + 5px)` }}
@@ -370,26 +381,54 @@ function Charts({ data, list, colors, stat, setTip }) {
   );
 }
 
+// Tooltip di dekat pointer, tapi selalu utuh di dalam layar: setelah diukur,
+// pindah ke kiri/atas pointer kalau tidak muat, lalu dijepit 8px dari tepi.
+// Dirender di <body> (portal): .main punya transform dari animasinya, dan di
+// dalamnya position: fixed tidak lagi dihitung dari layar.
+const TIP_GAP = 14;
+const TIP_MARGIN = 8;
 function Tooltip({ tip, stat }) {
   const { row } = tip;
-  const left = Math.min(tip.x + 14, window.innerWidth - 260);
-  return (
-    <div className="kn-tip" style={{ left, top: tip.y + 14 }} role="tooltip">
-      <div className="kn-tip-value">{fmtPct(row[stat])}</div>
+  const ref = useRef(null);
+  const [place, setPlace] = useState(null);
+
+  useLayoutEffect(() => {
+    const { width, height } = ref.current.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth;
+    const vh = window.innerHeight;
+    let left = tip.x + TIP_GAP;
+    if (left + width > vw - TIP_MARGIN) left = tip.x - TIP_GAP - width;
+    let top = tip.y + TIP_GAP;
+    if (top + height > vh - TIP_MARGIN) top = tip.y - TIP_GAP - height;
+    const clamp = (v, size, max) => Math.max(TIP_MARGIN, Math.min(v, max - size - TIP_MARGIN));
+    setPlace({ left: clamp(left, width, vw), top: clamp(top, height, vh) });
+  }, [tip.x, tip.y, row]);
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="kn-tip"
+      style={place ?? { left: 0, top: 0, visibility: 'hidden' }}
+      role="tooltip"
+    >
+      <div className={`kn-tip-value ${trendClass(row[stat])}`}>{fmtPct(row[stat])}</div>
       <div className="kn-tip-title">{row.rumah_sakit}</div>
       <div className="kn-tip-sub">{row.kategori_besar} · {row.from} → {row.to}</div>
       <table className="kn-tip-table">
         <tbody>
           {STATS.map(s => (
             <tr key={s.key} className={s.key === stat ? 'active' : ''}>
-              <td>{s.label}</td><td>{fmtPct(row[s.key])}</td>
+              <td>{s.label}</td><td className={trendClass(row[s.key])}>{fmtPct(row[s.key])}</td>
             </tr>
           ))}
           <tr><td>Item dibandingkan</td><td>{fmtInt(row.n)}</td></tr>
-          <tr><td>Naik / tetap / turun</td><td>{fmtInt(row.naik)} / {fmtInt(row.tetap)} / {fmtInt(row.turun)}</td></tr>
+          <tr className="kn-tip-sep"><td>Naik</td><td className="kn-up">{fmtShare(row.naik, row.n)}</td></tr>
+          <tr><td>Tetap</td><td>{fmtShare(row.tetap, row.n)}</td></tr>
+          <tr><td>Turun</td><td className="kn-down">{fmtShare(row.turun, row.n)}</td></tr>
         </tbody>
       </table>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -409,7 +448,9 @@ function StatsTable({ data, list, colors }) {
               <th>Periode</th><th>Kategori besar</th><th>Rumah sakit</th>
               <th className="right">Item</th>
               {STATS.map(s => <th key={s.key} className="right">{s.label}</th>)}
-              <th className="right">Naik / tetap / turun</th>
+              <th className="right">Naik</th>
+              <th className="right">Tetap</th>
+              <th className="right">Turun</th>
             </tr>
           </thead>
           <tbody>
@@ -422,8 +463,10 @@ function StatsTable({ data, list, colors }) {
                   {r.rumah_sakit}
                 </td>
                 <td className="right">{fmtInt(r.n)}</td>
-                {STATS.map(s => <td key={s.key} className="right">{fmtPct(r[s.key])}</td>)}
-                <td className="right">{fmtInt(r.naik)} / {fmtInt(r.tetap)} / {fmtInt(r.turun)}</td>
+                {STATS.map(s => <td key={s.key} className={`right ${trendClass(r[s.key])}`}>{fmtPct(r[s.key])}</td>)}
+                <td className="right kn-up">{fmtShare(r.naik, r.n)}</td>
+                <td className="right">{fmtShare(r.tetap, r.n)}</td>
+                <td className="right kn-down">{fmtShare(r.turun, r.n)}</td>
               </tr>
             ))}
           </tbody>
