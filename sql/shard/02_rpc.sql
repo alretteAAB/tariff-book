@@ -96,12 +96,15 @@ begin
 end $$;
 
 -- --- RPC: search (data + total for pagination) ------------------
--- Same result as before (rows, order, pct_increase, total_count), but:
 -- * keyword and filters become id lists first (tarif_where), so tarif_v2 is
 --   read through its indexes instead of joining all 1.8M rows to compare
 --   names;
 -- * the total is counted separately, so fetching one page can stop early
---   instead of materializing every match.
+--   instead of materializing every match;
+-- * pct_increase compares each row with the previous year (tahun - 1) of the
+--   same item in the SAME hospital: same rumah_sakit, layanan, kategori and
+--   raw kelas_kamar (empty only matches empty). Several prices last year ->
+--   their average. No row last year, or a price of 0 -> null.
 create or replace function search_tarif(
   q text default null,
   f_kategori text[] default null,
@@ -121,8 +124,7 @@ declare
   v_offset int  := (greatest(page, 1) - 1) * page_size;
   v_order  text := build_order_by(sort);
   v_where  text := tarif_where(q, f_kategori, f_rumah_sakit, f_tahun, f_kelas, true);
-  -- one row per matching tarif row and per matching 2025 row (the old join
-  -- produced a row for each 2025 match; kept so totals and pages match)
+  -- one row per matching tarif row
   v_from   text := format($f$
     from (select tv.*, k.nama as kategori_harga, l.nama as nama_layanan,
                  kk.nama as kelas_kamar, rs.nama as rumah_sakit
@@ -133,13 +135,43 @@ declare
           left join kelas_kamar_ref kk on kk.id = tv.kelas_kamar_id
           where %s %%s) t
     join rumahsakit r on r.rumah_sakit = t.rumah_sakit
-    left join room_class_mapping rm on rm.room_class = t.kelas_kamar
-    left join tarif_v2 p
-      on p.layanan_id  = t.layanan_id
-     and p.kategori_id = t.kategori_id
-     and p.kelas_kamar_id is not distinct from t.kelas_kamar_id
-     and p.tahun = 2025
-     and p.rumah_sakit_id is not null$f$, v_where);
+    left join room_class_mapping rm on rm.room_class = t.kelas_kamar$f$, v_where);
+  -- Last year's average price of the identical item, same hospital, as "p".
+  -- Usually looked up per row (only the rows of the page need it). Sorting a
+  -- large result by pct needs it for every row: then one hash join over last
+  -- year's rows is much faster (see the choice below).
+  v_prev_row text := $f$
+    left join lateral (
+      select avg(p.tarif) as tarif
+      from tarif_v2 p
+      where p.layanan_id     = t.layanan_id
+        and p.kategori_id    = t.kategori_id
+        and p.tahun          = t.tahun - 1
+        and p.rumah_sakit_id = t.rumah_sakit_id
+        and p.kelas_kamar_id is not distinct from t.kelas_kamar_id
+    ) p on true$f$;
+  -- Same filters with the years shifted back by one; coalesce(kelas, -1) makes
+  -- "empty matches empty" a plain, hashable equality; the latest year can
+  -- never be anyone's last year (passed as a number: a max() subquery in the
+  -- query would stop Postgres from using parallel workers).
+  v_last_year int := coalesce((select max(tv.tahun) from tarif_v2 tv), 0);
+  v_prev_all text := format($f$
+    left join (
+      select tv.rumah_sakit_id, tv.layanan_id, tv.kategori_id,
+             coalesce(tv.kelas_kamar_id, -1) as kelas, tv.tahun + 1 as tahun,
+             avg(tv.tarif) as tarif
+      from tarif_v2 tv
+      where %s and tv.tahun < %s
+      group by 1, 2, 3, 4, 5
+    ) p
+      on p.rumah_sakit_id = t.rumah_sakit_id
+     and p.layanan_id     = t.layanan_id
+     and p.kategori_id    = t.kategori_id
+     and p.kelas          = coalesce(t.kelas_kamar_id, -1)
+     and p.tahun          = t.tahun$f$,
+    tarif_where(q, f_kategori, f_rumah_sakit,
+                (select array_agg(y - 1) from unnest(f_tahun) y), f_kelas, true),
+    v_last_year);
   v_total bigint;
 begin
   execute 'select count(*) ' || format(v_from, '') into v_total;
@@ -150,13 +182,15 @@ begin
   -- find a page's worth early, which is slow when matches are rare).
   -- Larger results keep the walk, which is the fast plan there.
   v_from := format(v_from, case when v_total <= 100000 then 'offset 0' else '' end);
+  v_from := v_from || case when v_total > 100000 and position('pct_increase' in v_order) > 0
+                           then v_prev_all else v_prev_row end;
 
   return query execute
     'select t.kategori_harga::text, t.nama_layanan::text,
             coalesce(rm.mapped_room_class, t.kelas_kamar)::text as kelas_kamar,
             t.tarif::numeric, r.display_name::text as rumah_sakit, r.nama_group::text as nama_group,
             t.tahun::int,
-            case when t.tahun = 2026 and p.tarif is not null and p.tarif <> 0
+            case when p.tarif <> 0
                  then round((t.tarif - p.tarif) * 100.0 / p.tarif, 2)
             end as pct_increase,
             $1 as total_count '
