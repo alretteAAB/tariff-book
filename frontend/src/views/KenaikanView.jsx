@@ -228,7 +228,7 @@ export default function KenaikanView() {
                 {d => (
                   <>
                     <Charts data={d} rs={rs} stat={stat} setTip={setTip} />
-                    <StatsTable data={d} />
+                    <Unmapped data={d} />
                   </>
                 )}
               </ApiBlock>
@@ -398,6 +398,7 @@ function Charts({ data, rs, stat, setTip }) {
                   : `Tidak ada item yang sama di ${p.from} dan ${p.to}.`}
               </div>
             )}
+            <PeriodTable data={data} period={p} />
           </section>
         );
       })}
@@ -456,45 +457,52 @@ function Tooltip({ tip, stat }) {
   );
 }
 
-function StatsTable({ data }) {
-  const rows = [...data.rows].sort((a, b) => a.from - b.from
-    || data.kategori.indexOf(a.kategori_besar) - data.kategori.indexOf(b.kategori_besar));
-  if (!rows.length) return null;
+const STAT_HEADS = ['Item', ...STATS.map(s => s.label), ...LABELS_TAHUN];
+function statCells(r) {
+  if (!r) return STAT_HEADS.map(h => <td key={h} className="right kn-cell-empty">–</td>);
+  return [
+    <td key="n" className="right">{fmtInt(r.n)}</td>,
+    ...STATS.map(s => <td key={s.key} className={`right ${trendClass(r[s.key])}`}>{fmtPct(r[s.key])}</td>),
+    <td key="naik" className="right kn-up">{fmtShare(r.naik, r.n)}</td>,
+    <td key="tetap" className="right">{fmtShare(r.tetap, r.n)}</td>,
+    <td key="turun" className="right kn-down">{fmtShare(r.turun, r.n)}</td>,
+  ];
+}
+
+function Unmapped({ data }) {
+  if (!data.unmapped.length) return null;
   return (
-    <>
-      <div className="kn-table-title">Semua statistik</div>
-      <div className="table-wrap">
-        <table className="kn-table">
-          <thead>
-            <tr>
-              <th>Periode</th><th>Kategori besar</th>
-              <th className="right">Item</th>
-              {STATS.map(s => <th key={s.key} className="right">{s.label}</th>)}
-              {LABELS_TAHUN.map(l => <th key={l} className="right">{l}</th>)}
+    <div className="kn-unmapped">
+      Tidak termasuk 5 kategori (tidak dihitung):{' '}
+      {data.unmapped.map(u => `${u.from}→${u.to}: ${fmtInt(u.n)} item`).join(' · ')}
+    </div>
+  );
+}
+
+// Semua statistik satu periode, di bawah grafiknya: baris = kategori besar,
+// kolom = statistik. Lebih lebar dari kartu -> digeser ke samping di dalam kartu.
+function PeriodTable({ data, period }) {
+  const byKat = new Map(data.rows.filter(r => r.from === period.from).map(r => [r.kategori_besar, r]));
+  if (!byKat.size) return null;
+  return (
+    <div className="table-wrap kn-period-table">
+      <table className="kn-table kn-stats-table">
+        <thead>
+          <tr>
+            <th className="kn-sticky">Kategori besar</th>
+            {STAT_HEADS.map(h => <th key={h} className="right">{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {data.kategori.map(k => (
+            <tr key={k}>
+              <td className="kn-sticky kn-kelas-kat">{k}</td>
+              {statCells(byKat.get(k))}
             </tr>
-          </thead>
-          <tbody>
-            {rows.map(r => (
-              <tr key={`${r.from}|${r.kategori_besar}`}>
-                <td>{r.from} → {r.to}</td>
-                <td>{r.kategori_besar}</td>
-                <td className="right">{fmtInt(r.n)}</td>
-                {STATS.map(s => <td key={s.key} className={`right ${trendClass(r[s.key])}`}>{fmtPct(r[s.key])}</td>)}
-                <td className="right kn-up">{fmtShare(r.naik, r.n)}</td>
-                <td className="right">{fmtShare(r.tetap, r.n)}</td>
-                <td className="right kn-down">{fmtShare(r.turun, r.n)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {data.unmapped.length > 0 && (
-        <div className="kn-unmapped">
-          Tidak termasuk 5 kategori (tidak dihitung):{' '}
-          {data.unmapped.map(u => `${u.from}→${u.to}: ${fmtInt(u.n)} item`).join(' · ')}
-        </div>
-      )}
-    </>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
