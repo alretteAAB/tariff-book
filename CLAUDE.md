@@ -13,7 +13,7 @@ compare the results.
   third-party hosts, Cloudflare it does not.
 - Data: **Supabase Postgres**, split into **shards** (one Supabase project
   each, identical schema). One hospital lives entirely on one shard, because
-  `pct_increase` compares 2026 with 2025 rows inside a database.
+  `pct_increase` compares each year with the previous one inside a database.
 - Functions talk to Supabase over HTTPS with `@supabase/supabase-js` and the
   **anon** key. All heavy SQL (trigram fuzzy search, `pct_increase`
   self-join, `DISTINCT ON`, dynamic sort) is in Postgres functions (RPC);
@@ -170,9 +170,13 @@ Cloudflare Pages build settings: root `frontend`, build command
 - **Text order:** multi-shard merges compare text with `Intl.Collator('en')`;
   Postgres uses the DB collation. Ordinary names agree; odd punctuation can
   order slightly differently than a single database would.
-- **`pct_increase` join** matches service, category and room class but not the
-  hospital, so within one shard a 2026 row can pick up another hospital's 2025
-  price. Moving hospitals to different shards changes which matches exist.
+- **`pct_increase`** (Tarif tab "% vs tahun lalu") is computed in `search_tarif`
+  at query time, nothing is stored: each row vs the average price of the
+  identical item (same hospital, layanan, kategori, raw kelas_kamar) in
+  `tahun - 1`. Usually looked up per row; when a result over 100k rows is
+  sorted by pct, one hash join over last year's rows is used instead (keep the
+  latest year passed as a number there: a `max()` subquery disables parallel
+  workers). The CSV `pct_increase` column is ignored for display.
 - **Free-plan pause:** keep `workers/keepalive` deployed with every shard
   listed in its `SHARDS` var and `SHARD_n_KEY` secrets.
 - Statement timeouts on ~2M rows were fixed by the indexes in `01_schema.sql`.

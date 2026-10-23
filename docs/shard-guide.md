@@ -6,8 +6,8 @@ is the project you already have (`wxixsguicwznoxgllfbo`). The website asks
 every shard and combines the answers, so users never see the split.
 
 Rule that everything follows: **one hospital lives entirely on one shard**
-(2025 and 2026 rows together, because `% vs tahun lalu` compares them inside
-one database). The scripts enforce this for you.
+(all its years together, because `% vs tahun lalu` compares each year with the
+previous one inside one database). The scripts enforce this for you.
 
 ---
 
@@ -228,9 +228,10 @@ dashboard and shown as "Tidak termasuk 5 kategori".
   hospital or year to see more; exports still go up to 50,000 rows.
 - Sorting text across shards can differ slightly from a single database for
   names with unusual punctuation.
-- `% vs tahun lalu` matches service + category + room class, not the hospital,
-  so within one shard a 2026 row can be compared with another hospital's 2025
-  price. After hospitals move to different shards, some of those numbers change.
+- `% vs tahun lalu` is calculated when you search, nothing to run after an
+  upload: each row against the same item (same hospital, service, category and
+  room class) in the year before. A year with no data for the year before shows
+  "—".
 - Backups: the free plan has no point-in-time restore. `pg_dump` before any
   move or cleanup.
 

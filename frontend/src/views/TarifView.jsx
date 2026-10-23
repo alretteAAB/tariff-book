@@ -525,9 +525,9 @@ export default function TarifView() {
                   <SortableTh col="tarif" label="Tarif" align="right" sortKeys={sortKeys} onSort={handleHeaderSort} />
                   <SortableTh col="pct_increase" label="% vs Last Year" align="right" sortKeys={sortKeys} onSort={handleHeaderSort}>
                     <InfoTip label="Informasi kolom kenaikan harga">
-                      Perubahan harga dibandingkan tahun sebelumnya.
-                      Tanda “—” berarti tidak ada data tahun lalu untuk item yang sama
-                      dengan kelas kamar dan kategori harga yang sama.
+                      Perubahan harga dibandingkan tahun sebelumnya di rumah sakit yang sama,
+                      untuk layanan, kategori harga, dan kelas kamar yang sama persis.
+                      Tanda “—” berarti item itu tidak ada di tahun sebelumnya.
                     </InfoTip>
                   </SortableTh>
                 </tr>
