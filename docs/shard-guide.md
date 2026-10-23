@@ -143,7 +143,11 @@ Then create a shard (section 1) or move a hospital out (section 3.1) and try aga
 ```bash
 python upload_tarif.py data_tarif_baru.csv
 ```
-At the end it prints the row count per hospital. Compare with your CSV.
+Per hospital it shows `[1/3] RS ... -> shard 2` and two progress bars with the
+time left: **Mencocokkan nama** (looking up / creating the ids of new service,
+category and room-class names; slow for a hospital with thousands of new names)
+and **Mengirim baris** (sending the rows). At the end it prints the total time and
+the row count per hospital. Compare with your CSV.
 
 ### 2.5 After uploading
 - New hospitals appear in the dropdown and in search right away. (Only after

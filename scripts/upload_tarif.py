@@ -23,7 +23,9 @@ Kredensial di scripts/.env (jangan di-commit):
 """
 import argparse
 import os
+import shutil
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -70,6 +72,77 @@ def shard_config() -> dict:
             sys.exit(f"SHARD_{sid}_URL / SHARD_{sid}_SERVICE_KEY belum diisi")
         config[sid] = (url, key)
     return config
+
+
+def fmt_int(n: int) -> str:
+    return f"{n:,}".replace(",", ".")
+
+
+def fmt_dur(seconds: float) -> str:
+    s = int(round(seconds))
+    if s < 60:
+        return f"{s}s"
+    if s < 3600:
+        return f"{s // 60}m{s % 60:02d}s"
+    return f"{s // 3600}j{s % 3600 // 60:02d}m"
+
+
+class Progress:
+    """Progress bar satu baris, contoh:
+        Mengirim baris    [##########----------]  52%  21.500/41.300  ~1m20s lagi
+    Di terminal baris itu diperbarui di tempat (paling sering 5x per detik).
+    Kalau output dialihkan ke file, dicetak satu baris tiap 10%.
+    Hanya karakter ASCII, supaya aman di console Windows mana pun."""
+
+    WIDTH = 20
+
+    def __init__(self, label: str, total: int):
+        self.label, self.total, self.done = label, total, 0
+        self.start = time.monotonic()
+        self.shown_at = 0.0
+        self.tty = sys.stdout.isatty()
+        self.next_pct = 10
+        self._show()
+
+    def add(self, n: int = 1) -> None:
+        self.done = min(self.total, self.done + n)
+        if self.tty:
+            now = time.monotonic()
+            if now - self.shown_at >= 0.2:
+                self.shown_at = now
+                self._show()
+        elif self.done < self.total and self.done * 100 >= self.next_pct * max(self.total, 1):
+            self.next_pct = self.done * 100 // max(self.total, 1) // 10 * 10 + 10
+            self._show()
+
+    def finish(self) -> None:
+        self.done = self.total
+        self._show(f"selesai dalam {fmt_dur(time.monotonic() - self.start)}")
+        if self.tty:
+            print()
+
+    def _show(self, tail: str = "") -> None:
+        frac = self.done / self.total if self.total else 1.0
+        elapsed = time.monotonic() - self.start
+        if not tail and 0 < self.done < self.total and elapsed > 1:
+            left = elapsed * (self.total - self.done) / self.done
+            tail = f"~{fmt_dur(left)} lagi" if left >= 1 else "<1s lagi"
+        head = f"  {self.label:<16} "
+        rest = f" {frac * 100:3.0f}%  {fmt_int(self.done)}/{fmt_int(self.total)}  {tail}".rstrip()
+        if self.tty:
+            # Tidak boleh lebih lebar dari terminal: baris yang terlipat tidak
+            # bisa ditimpa oleh \r dan setiap pembaruan jadi baris baru. Yang
+            # dikecilkan batangnya, supaya angka dan sisa waktu tetap terbaca.
+            width = shutil.get_terminal_size((80, 20)).columns - 1
+            bar_width = max(5, min(self.WIDTH, width - len(head) - len(rest) - 2))
+        else:
+            bar_width = self.WIDTH
+        filled = int(frac * bar_width)
+        line = f"{head}[{'#' * filled}{'-' * (bar_width - filled)}]{rest}"
+        if self.tty:
+            print("\r" + line[:width].ljust(width), end="", flush=True)
+        else:
+            print(line, flush=True)
 
 
 def clean(value):
@@ -152,6 +225,21 @@ class ShardWriter:
             self.db.table("room_class_mapping").upsert(rows, on_conflict="room_class").execute()
 
     def insert_tarif(self, df: pd.DataFrame) -> int:
+        # Fase 1: nama -> id. Nama yang belum dikenal butuh 1-2 request per nama,
+        # jadi untuk RS dengan ribuan layanan fase ini bisa beberapa menit.
+        columns = {"rumah_sakit_ref": "rumah_sakit", "kategori_ref": "kategori_harga",
+                   "kelas_kamar_ref": "kelas_kamar", "layanan_ref": "nama_layanan"}
+        todo = [(table, nama) for table, col in columns.items()
+                for nama in dict.fromkeys(clean(v) for v in df[col])
+                if nama is not None and nama not in self.cache[table]]
+        if todo:
+            bar = Progress("Mencocokkan nama", len(todo))
+            for table, nama in todo:
+                self.get_or_create_id(table, nama)
+                bar.add()
+            bar.finish()
+
+        # Fase 2: kirim baris (semua id sudah ada di cache)
         rows = [{
             "rumah_sakit_id": self.get_or_create_id("rumah_sakit_ref", clean(r.rumah_sakit)),
             "kategori_id":    self.get_or_create_id("kategori_ref", clean(r.kategori_harga)),
@@ -161,15 +249,17 @@ class ShardWriter:
             "tarif":          None if pd.isna(r.tarif) else int(r.tarif),
             "pct_increase":   clean(getattr(r, "pct_increase", None)),
         } for r in df.itertuples(index=False)]
+        bar = Progress("Mengirim baris", len(rows))
         for i in range(0, len(rows), BATCH_SIZE):
             # Baris yang persis sama dengan yang sudah ada (tarif_v2_unique_combo,
             # termasuk kolom kosong setelah 05_strict_unique.sql) dilewati, jadi
             # upload yang terputus atau terulang aman dijalankan lagi.
+            batch = rows[i:i + BATCH_SIZE]
             self.db.table("tarif_v2").upsert(
-                rows[i:i + BATCH_SIZE], on_conflict=UNIQUE_COLS, ignore_duplicates=True
+                batch, on_conflict=UNIQUE_COLS, ignore_duplicates=True
             ).execute()
-            print(f"    {min(i + BATCH_SIZE, len(rows))}/{len(rows)}", end="\r")
-        print()
+            bar.add(len(batch))
+        bar.finish()
         return len(rows)
 
 
@@ -224,15 +314,16 @@ def main() -> None:
             writers[sid].sync_room_mapping(mapping)
 
     master = df[["rumah_sakit", "group_non_group", "nama_group"]].drop_duplicates(subset=["rumah_sakit"])
-    for r in master.itertuples(index=False):
+    started = time.monotonic()
+    for i, r in enumerate(master.itertuples(index=False), start=1):
         sid = plan[r.rumah_sakit]
-        print(f"\n{r.rumah_sakit} -> shard {sid}")
+        print(f"\n[{i}/{len(master)}] {r.rumah_sakit} -> shard {sid} "
+              f"({fmt_int(rows_per_rs[r.rumah_sakit])} baris)")
         w = writers[sid]
         w.upsert_rumahsakit(r.rumah_sakit, clean(r.group_non_group), clean(r.nama_group))
-        n = w.insert_tarif(df[df["rumah_sakit"] == r.rumah_sakit])
-        print(f"  {n} baris dikirim")
+        w.insert_tarif(df[df["rumah_sakit"] == r.rumah_sakit])
 
-    print("\nSelesai. Jumlah baris per RS sekarang:")
+    print(f"\nSelesai dalam {fmt_dur(time.monotonic() - started)}. Jumlah baris per RS sekarang:")
     for sid in sorted(set(plan.values())):
         s = clients[sid].rpc("shard_stats").execute().data
         counts = {h["rumah_sakit"]: h["rows"] for h in s["hospitals"]}
