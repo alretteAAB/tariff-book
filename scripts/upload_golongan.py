@@ -23,7 +23,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from upload_tarif import load_env
+from upload_tarif import Progress, load_env
 
 BATCH_SIZE = 500
 UNIQUE_COLS = "rumah_sakit,specialty,golongan,service_code,nama_layanan"
@@ -93,12 +93,15 @@ def main() -> None:
         print("\n--dry-run: tidak ada yang ditulis.")
         return
 
-    for i in range(0, len(rows), BATCH_SIZE):
-        db.table("golongan_operasi").upsert(
-            rows[i:i + BATCH_SIZE], on_conflict=UNIQUE_COLS, ignore_duplicates=True
-        ).execute()
-        print(f"  {min(i + BATCH_SIZE, len(rows))}/{len(rows)}", end="\r")
     print()
+    bar = Progress("Mengirim baris", len(rows))
+    for i in range(0, len(rows), BATCH_SIZE):
+        batch = rows[i:i + BATCH_SIZE]
+        db.table("golongan_operasi").upsert(
+            batch, on_conflict=UNIQUE_COLS, ignore_duplicates=True
+        ).execute()
+        bar.add(len(batch))
+    bar.finish()
 
     after = {h["rumah_sakit"]: h["rows"] for h in db.rpc("shard_stats").execute().data["hospitals"]}
     print("\nSelesai. Jumlah baris per RS sekarang:")
