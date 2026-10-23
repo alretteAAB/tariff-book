@@ -964,14 +964,18 @@ export const styles = `
   /* Naik = merah, turun = hijau (teks saja; tanda +/− tetap ada) */
   .kn-up, .kn-tip-table td.kn-up { color: #b42318; }
   .kn-down, .kn-tip-table td.kn-down { color: #157a3c; }
-  .kn-table-title {
-    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;
-    color: var(--gold); margin-bottom: 10px;
-  }
   .kn-table th, .kn-table td { padding: 10px 10px; }
   .kn-table td { font-size: 12px; white-space: nowrap; }
   .kn-table td.right { text-align: right; font-variant-numeric: tabular-nums; }
   .kn-unmapped { margin-top: 10px; font-size: 11px; color: var(--text-muted); line-height: 1.6; }
+
+  /* Tabel statistik di bawah grafik tiap periode (digeser ke samping di dalam kartu) */
+  .kn-period-table { margin-top: 14px; box-shadow: none; }
+  .kn-stats-table th, .kn-stats-table td { padding: 9px 10px; white-space: nowrap; font-size: 11px; }
+  .kn-stats-table th { font-size: 10px; letter-spacing: 0.4px; }
+  .kn-stats-table .kn-sticky { position: sticky; left: 0; z-index: 1; box-shadow: inset -1px 0 0 var(--border); }
+  .kn-stats-table th.kn-sticky { background: var(--surface); }
+  .kn-stats-table td.kn-sticky { background: var(--card); }
 
   /* ─── RESPONSIVE ──────────────────────────────────── */
   @media (max-width: 680px) {
