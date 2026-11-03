@@ -57,7 +57,7 @@ export default function App() {
               marginLeft: 12,
               padding: "8px 14px",
               background: "#E8272A",
-              color: "#fff",
+              color: "#8A6010",
               borderRadius: 8,
               fontSize: "0.875rem",
               fontWeight: 600,
