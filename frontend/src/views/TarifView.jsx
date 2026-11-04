@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { API, highlight, formatRupiah, scrollToTop, readStoredFilters, storeFilters } from "../lib/utils.jsx";
 import { InfoTip } from "../components/InfoTip.jsx";
 import { MultiSelectDropdown } from "../components/MultiSelectDropdown.jsx";
@@ -6,6 +6,19 @@ import { Pagination } from "../components/Pagination.jsx";
 import { SortPanel } from "../components/SortPanel.jsx";
 import { SortableTh } from "../components/SortableTh.jsx";
 import CompareView from "./CompareView.jsx";
+
+const NONE = [];
+const yearLabel = (v) => String(v);
+// Nilai `key` dari relasi milik RS terpilih, dalam urutan daftar `all`.
+// Satu putaran atas relasi (bukan kategori × relasi): daftar ini dihitung ulang
+// hanya saat pilihan RS atau data filter berubah, tidak di setiap ketikan.
+function availableFor(all, relations, key, selectedRS) {
+  if (!selectedRS.length) return all;
+  const rs = new Set(selectedRS);
+  const keep = new Set();
+  for (const r of relations) if (rs.has(r.rumah_sakit)) keep.add(r[key]);
+  return all.filter(v => keep.has(v));
+}
 
 // Kolom yang bisa diurutkan (urutannya mengikuti urutan kolom tabel).
 // `numeric` menentukan arah default saat kolom pertama kali dipilih.
@@ -121,32 +134,30 @@ export default function TarifView() {
   }, []);
 
   // ─── Cascading filter logic ───────────────────────────────────────
-  const relations = filters.relations || [];
-  const kelasRelations = filters.kelas_relations || [];
+  const relations = filters.relations || NONE;
+  const kelasRelations = filters.kelas_relations || NONE;
 
   // Rumah Sakit selalu menampilkan semua opsi — pilihan Kategori/Kelas Kamar
   // TIDAK menghilangkan kandidat Rumah Sakit (dependensi satu arah saja).
   const availableRS = filters.rumah_sakit;
 
-  const availableKategori = selectedRS.length > 0
-    ? filters.kategori.filter(k =>
-        relations.some(r => selectedRS.includes(r.rumah_sakit) && r.kategori_harga === k)
-      )
-    : filters.kategori;
+  const availableKategori = useMemo(
+    () => availableFor(filters.kategori, relations, 'kategori_harga', selectedRS),
+    [filters.kategori, relations, selectedRS]);
 
-  const availableKelas = selectedRS.length > 0
-    ? filters.kelas_kamar.filter(k =>
-        kelasRelations.some(r => selectedRS.includes(r.rumah_sakit) && r.kelas_kamar === k)
-      )
-    : filters.kelas_kamar;
+  const availableKelas = useMemo(
+    () => availableFor(filters.kelas_kamar, kelasRelations, 'kelas_kamar', selectedRS),
+    [filters.kelas_kamar, kelasRelations, selectedRS]);
 
   // Saat Rumah Sakit berubah, buang pilihan Kategori/Kelas Kamar yang tak lagi tersedia
   useEffect(() => {
     if (!isMountedRS.current) { isMountedRS.current = true; return; }
     if (availableKategori.length > 0) {
-      setSelectedKategori(prev => prev.filter(k => availableKategori.includes(k)));
+      const ok = new Set(availableKategori);
+      setSelectedKategori(prev => prev.filter(k => ok.has(k)));
     }
-    setSelectedKelas(prev => prev.filter(k => availableKelas.includes(k)));
+    const okKelas = new Set(availableKelas);
+    setSelectedKelas(prev => prev.filter(k => okKelas.has(k)));
   }, [selectedRS]); // eslint-disable-line react-hooks/exhaustive-deps
   // ─────────────────────────────────────────────────────────────────
 
@@ -321,7 +332,7 @@ export default function TarifView() {
               options={filters.tahun || []}
               selected={selectedTahun}
               onChange={setSelectedTahun}
-              formatLabel={v => String(v)}
+              formatLabel={yearLabel}
             />
             {showRS && (
               <MultiSelectDropdown

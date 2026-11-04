@@ -1,10 +1,16 @@
-import { useState, useEffect, useRef } from "react";
+import { memo, useState, useEffect, useMemo, useRef } from "react";
 
 // ─── MultiSelectDropdown ────────────────────────────────────────────
 // isDisabled(option): opsi tampil abu-abu dan tidak bisa dicentang.
 // emptyLabel: teks tombol saat belum ada yang dipilih (default "Semua <label>").
 // single: hanya satu pilihan; klik langsung mengganti pilihan dan menutup menu.
-export function MultiSelectDropdown({ label, options, selected, onChange, formatLabel, isDisabled, emptyLabel, single }) {
+// Menu menggambar paling banyak MAX_SHOWN opsi (daftar Kategori bisa ribuan);
+// sisanya dicapai lewat kotak cari. Pilih/Hapus Semua tetap berlaku untuk semua
+// hasil pencarian, bukan hanya yang tergambar.
+const MAX_SHOWN = 300;
+const toText = (v) => String(v);
+
+export const MultiSelectDropdown = memo(function MultiSelectDropdown({ label, options, selected, onChange, formatLabel, isDisabled, emptyLabel, single }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef(null);
@@ -17,10 +23,12 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const fmt = formatLabel || (v => String(v));
-  const filtered = options.filter(o =>
-    fmt(o).toLowerCase().includes(search.toLowerCase())
-  );
+  const fmt = formatLabel || toText;
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return q ? options.filter(o => fmt(o).toLowerCase().includes(q)) : options;
+  }, [options, search, fmt]);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const selectable = isDisabled ? filtered.filter(o => !isDisabled(o)) : filtered;
 
@@ -30,7 +38,7 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
       setOpen(false);
       return;
     }
-    onChange(selected.includes(val)
+    onChange(selectedSet.has(val)
       ? selected.filter(v => v !== val)
       : [...selected, val]
     );
@@ -79,14 +87,14 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
             <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange([...new Set([...selected, ...selectable])]); }}>
               Pilih Semua
             </button>
-            <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); onChange(selected.filter(v => !filtered.includes(v))); }}>
+            <button className="msd-action-btn" onMouseDown={e => { e.preventDefault(); const drop = new Set(filtered); onChange(selected.filter(v => !drop.has(v))); }}>
               Hapus Semua
             </button>
           </div>}
           <div className="msd-list">
             {filtered.length === 0 && <div className="msd-empty">Tidak ditemukan</div>}
-            {filtered.map(opt => {
-              const isChecked = selected.includes(opt);
+            {filtered.slice(0, MAX_SHOWN).map(opt => {
+              const isChecked = selectedSet.has(opt);
               const disabled = isDisabled?.(opt) && !isChecked;
               return (
                 <div
@@ -102,9 +110,14 @@ export function MultiSelectDropdown({ label, options, selected, onChange, format
                 </div>
               );
             })}
+            {filtered.length > MAX_SHOWN && (
+              <div className="msd-more">
+                +{(filtered.length - MAX_SHOWN).toLocaleString('id-ID')} lainnya — ketik untuk mempersempit
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
-}
+});
