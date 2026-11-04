@@ -31,6 +31,19 @@ export const styles = `
     --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
   }
 
+  /* ─── SCROLLBAR (satu tema dengan app) ────────────────
+     scrollbar-color: Chrome/Edge 121+, Firefox. ::-webkit-scrollbar: Safari
+     dan Chrome lama (diabaikan browser yang sudah memakai scrollbar-color). */
+  * { scrollbar-color: var(--border-mid) var(--card-2); scrollbar-width: thin; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--card-2); }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-mid); border-radius: 10px;
+    border: 2px solid var(--card-2);
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-light); }
+  ::-webkit-scrollbar-corner { background: var(--card-2); }
+
   body {
     background: var(--bg);
     font-family: var(--font-body);
