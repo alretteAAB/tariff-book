@@ -44,7 +44,7 @@ export default function App() {
               className={`nav-tab ${tab === 'kenaikan' ? 'active' : ''}`}
               onClick={() => setTab('kenaikan')}
             >
-              Kenaikan Harga
+              Dashboard
             </button>
           </nav>
           <a
