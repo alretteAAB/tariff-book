@@ -36,6 +36,14 @@ grant execute on function shard_stats         to anon;
 -- upload/move scripts (service_role) and the SQL Editor (postgres) run it.
 revoke execute on function refresh_filters from public, anon, authenticated;
 grant  execute on function refresh_filters to service_role;
+-- the delete trigger runs as whoever deletes (postgres / service_role only);
+-- skipped when 02_rpc.sql has not created it yet
+do $$
+begin
+  if to_regprocedure('refresh_filters_after_delete()') is not null then
+    revoke execute on function refresh_filters_after_delete() from public, anon, authenticated;
+  end if;
+end $$;
 
 -- --- anon reads (Supabase grants these by default; explicit here so the
 -- RPCs never depend on that default) ------------------------------
