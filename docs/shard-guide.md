@@ -198,14 +198,53 @@ Edit the file in `sql/shard/`, then run it on **every** shard. If you re-run
 ### 3.4b The filter list is cached
 The dropdown lists (hospitals, categories, years, room classes) are stored in
 the `filters_cache` table of each shard instead of being recomputed from all
-rows on every page load. `upload_tarif.py` and `move-hospital.js` refresh it
-when they finish. If you change data any other way (SQL Editor, Table Editor,
-an old script), run this on that shard afterwards:
+rows on every page load. They only list what still has tarif rows.
+
+- **Uploads:** `upload_tarif.py` refreshes the list when it finishes.
+- **Deleting rows** (SQL Editor, Table Editor, `move-hospital.js --delete`)
+  refreshes it automatically. The delete takes a few seconds longer because of
+  that.
+- **Adding rows any other way** (SQL Editor, Table Editor, an old script): run
+  this on that shard afterwards:
 ```sql
 select refresh_filters();
 ```
-Browsers also keep the list for up to 5 minutes, so new hospitals can take
-that long to appear in the dropdown for someone who already had the page open.
+Browsers also keep the list for up to 5 minutes: press Ctrl+Shift+R to see a
+change right away.
+
+### 3.4b2 Removing wrongly uploaded data
+Example: hospital "Mitra Keluarga Bekasi Timur", year 2024. In the SQL Editor of
+the shard that holds it (`select shard_stats();` shows which one):
+```sql
+-- 1. how many rows per year
+select t.tahun, count(*)
+from tarif_v2 t
+join rumah_sakit_ref rs on rs.id = t.rumah_sakit_id
+join rumahsakit r       on r.rumah_sakit = rs.nama
+where r.display_name = 'Mitra Keluarga Bekasi Timur'
+group by 1 order by 1;
+
+-- 2. delete; put the count from step 1 in both places. If the number of
+--    deleted rows differs, nothing is deleted.
+do $$
+declare n int;
+begin
+  delete from tarif_v2
+  where tahun = 2024
+    and rumah_sakit_id in (
+      select rs.id from rumah_sakit_ref rs
+      join rumahsakit r on r.rumah_sakit = rs.nama
+      where r.display_name = 'Mitra Keluarga Bekasi Timur');
+  get diagnostics n = row_count;
+  if n <> 41250 then
+    raise exception 'Would delete % rows, not 41250. Cancelled, nothing deleted.', n;
+  end if;
+end $$;
+```
+The filters update by themselves (3.4b). The names in the `*_ref` tables stay;
+names without rows are not shown anywhere, so they need no cleanup. Deleting does
+not shrink the database (see `sql/shard/runbook-reclaim-space.md` if the shard is
+nearly full).
 
 ### 3.4c The Kenaikan Harga tab
 It needs `kenaikan_tarif`, `selisih_kelas_tarif` and the `rs_tahun` list from

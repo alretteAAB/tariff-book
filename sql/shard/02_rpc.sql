@@ -451,13 +451,14 @@ returns jsonb language sql stable as $$
     'kategori',    (select coalesce(jsonb_agg(k.nama order by k.nama), '[]') from kategori_ref k
                     where exists (select 1 from tarif_v2 t where t.kategori_id = k.id
                                   and t.rumah_sakit_id is not null and t.layanan_id is not null)),
-    'rumah_sakit', (select coalesce(jsonb_agg(d order by d), '[]') from (select distinct display_name d from rumahsakit) x),
+    -- hospitals and room classes that still have rows (a hospital whose rows were
+    -- all deleted stays in `rumahsakit`, with its display_name, but not in the list)
+    'rumah_sakit', (select coalesce(jsonb_agg(d order by d), '[]') from (select distinct rumah_sakit d from rel) x),
     'tahun',       (select coalesce(jsonb_agg(th order by th desc), '[]')
                     from (select distinct tahun th from tarif_v2
                           where rumah_sakit_id is not null and kategori_id is not null and layanan_id is not null) x),
     'kelas_kamar', (select coalesce(jsonb_agg(kk order by kk), '[]')
-                    from (select distinct coalesce(mapped_room_class, room_class) kk from room_class_mapping) x
-                    where kk is not null),
+                    from (select distinct kelas_kamar kk from krel) x),
     'relations',       (select coalesce(jsonb_agg(jsonb_build_object('kategori_harga', kategori_harga, 'rumah_sakit', rumah_sakit)
                                                   order by kategori_harga, rumah_sakit), '[]') from rel),
     'kelas_relations', (select coalesce(jsonb_agg(jsonb_build_object('kelas_kamar', kelas_kamar, 'rumah_sakit', rumah_sakit)
@@ -475,6 +476,24 @@ returns jsonb language sql volatile as $$
   returning data;
 $$;
 
+-- Deleting rows (SQL Editor, Table Editor, move-hospital.js --delete) refreshes
+-- the cache right away, once per statement. Inserts do not: the upload script
+-- sends 500-row batches and refreshes once when it is done; after inserting by
+-- hand, run  select refresh_filters();
+create or replace function refresh_filters_after_delete()
+returns trigger language plpgsql as $$
+begin
+  perform refresh_filters();
+  return null;
+end $$;
+
+drop trigger if exists tarif_v2_refresh_filters_delete on tarif_v2;
+create trigger tarif_v2_refresh_filters_delete
+  after delete on tarif_v2 for each statement execute function refresh_filters_after_delete();
+drop trigger if exists tarif_v2_refresh_filters_truncate on tarif_v2;
+create trigger tarif_v2_refresh_filters_truncate
+  after truncate on tarif_v2 for each statement execute function refresh_filters_after_delete();
+
 -- What the website calls: the stored result, or a live computation when the
 -- cache has never been filled.
 create or replace function get_filters()
@@ -482,5 +501,6 @@ returns jsonb language sql stable as $$
   select coalesce((select data from filters_cache where id = 1), compute_filters());
 $$;
 
--- --- Refresh planner stats --------------------------------------
+-- --- Refresh planner stats and the filter cache -----------------
 analyze tarif_v2;
+select refresh_filters();

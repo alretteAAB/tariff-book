@@ -188,7 +188,12 @@ Cloudflare Pages build settings: root `frontend`, build command
   matches the page is fetched with an `OFFSET 0` fence (fetch-then-sort),
   above that the planner's ordered walk is faster.
 - **Filters are cached:** `get_filters()` returns `filters_cache` (filled by
-  `refresh_filters()`, which only postgres/service_role may run). The upload
-  and move scripts refresh it; after manual data changes run
-  `select refresh_filters();`. `/api/filters` sends `max-age=300`, and the
-  Tarif tab shows the last list from localStorage while fetching the new one.
+  `refresh_filters()`, which only postgres/service_role may run). Every list is
+  computed from `tarif_v2` rows (a hospital with no rows left is not listed,
+  though its `rumahsakit` row and display_name stay). Deletes refresh it on
+  their own: statement-level `AFTER DELETE` / `AFTER TRUNCATE` triggers on
+  `tarif_v2` (~7 s on 1.8M rows, once per statement). Inserts do not (500-row
+  upload batches): the upload script refreshes once at the end; after manual
+  inserts run `select refresh_filters();`. `02_rpc.sql` ends with a refresh.
+  `/api/filters` sends `max-age=300`, and the Tarif tab shows the last list from
+  localStorage while fetching the new one.
