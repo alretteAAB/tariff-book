@@ -333,6 +333,10 @@ export const styles = `
   }
   .msd-item.checked .msd-checkmark { display: block; }
   .msd-item-text { flex: 1; line-height: 1.3; }
+  .msd-more {
+    padding: 8px 12px; font-size: 11px; color: var(--text-dim);
+    border-top: 1px solid var(--border); font-style: italic;
+  }
   .msd-empty {
     padding: 14px; text-align: center;
     font-size: 12px; color: var(--text-muted);
