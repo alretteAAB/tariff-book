@@ -56,7 +56,7 @@ export default function App() {
               flexShrink: 0,
               marginLeft: 12,
               padding: "8px 14px",
-              background: "##8A6010",
+              background: "#8A6010",
               color: "#fff",
               borderRadius: 8,
               fontSize: "0.875rem",
