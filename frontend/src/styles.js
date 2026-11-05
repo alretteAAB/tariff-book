@@ -995,48 +995,109 @@ export const styles = `
   .kn-stats-table td.kn-sticky { background: var(--card); }
 
   /* ─── CLINICAL PATHWAY ────────────────────────────── */
-  .cp-list { display: flex; flex-direction: column; gap: 10px; }
+  /* Daftar card; dengan panel detail terbuka: daftar 35% kiri, panel 65% kanan. */
+  .cp-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+  .cp-layout.has-detail { grid-template-columns: minmax(0, 35fr) minmax(0, 65fr); }
+  .cp-list { display: flex; flex-direction: column; gap: 8px; }
+
   .cp-card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+    display: flex; align-items: center; gap: 20px; width: 100%;
+    padding: 14px 18px; text-align: left; cursor: pointer;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-family: var(--font-body); color: var(--text);
   }
-  .cp-card.open { border-color: var(--border-mid); }
-  .cp-head {
-    width: 100%; display: flex; align-items: center; gap: 18px;
-    padding: 14px 18px; background: none; border: none; cursor: pointer;
-    text-align: left; font-family: var(--font-body); color: var(--text);
+  .cp-card:hover { border-color: var(--border-mid); }
+  .cp-card:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .cp-card.selected { border-color: var(--gold); background: var(--gold-dim); }
+  .cp-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .cp-rs { font-size: 12px; font-weight: 600; color: var(--gold); }
+  .cp-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .cp-meta { font-size: 12px; color: var(--text-muted); }
+
+  /* Harga per kelas: di card (kanan, atau di bawah saat daftar menyempit) dan di panel */
+  .cp-prices { display: flex; gap: 0; margin: 0; flex-shrink: 0; }
+  .cp-price { padding: 2px 14px; border-left: 1px solid var(--border); text-align: right; }
+  .cp-price:first-child { border-left: none; }
+  .cp-price dt { font-size: 11px; color: var(--text-muted); }
+  .cp-price dd { margin: 0; font-size: 14px; font-weight: 700; color: var(--gold-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cp-price-none { font-size: 12px; font-weight: 400; font-style: italic; color: var(--text-dim); }
+  .cp-layout.has-detail .cp-card { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
+  .cp-layout.has-detail .cp-card .cp-prices { flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 8px; }
+  .cp-layout.has-detail .cp-card .cp-price { flex: 1 1 0; min-width: 0; padding: 0 10px; text-align: left; }
+  .cp-layout.has-detail .cp-card .cp-price:first-child { padding-left: 0; }
+  .cp-layout.has-detail .cp-card .cp-price dd { font-size: 13px; }
+
+  /* Panel detail: tetap terlihat saat daftar di-scroll */
+  .cp-detail {
+    position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto;
+    background: var(--card); border: 1px solid var(--border-mid); border-radius: var(--radius-sm);
+    padding: 0 24px 24px; animation: cpSlide 0.16s ease-out;
   }
-  .cp-head:hover { background: var(--gold-dim); }
-  .cp-head:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
-  .cp-title-wrap { flex: 1; min-width: 0; }
-  .cp-rs { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--gold); }
-  .cp-title { font-size: 15px; font-weight: 700; margin-top: 2px; line-height: 1.3; }
-  .cp-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
-  .cp-chip {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.3px; padding: 2px 7px;
-    border-radius: 10px; background: var(--card-2); border: 1px solid var(--border); color: var(--text-muted);
+  @keyframes cpSlide { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .cp-detail { animation: none; } }
+  .cp-detail-bar {
+    position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px;
+    margin: 0 -24px; padding: 12px 24px; background: var(--card); border-bottom: 1px solid var(--border);
   }
-  .cp-prices { display: flex; gap: 6px; flex-shrink: 0; }
-  .cp-price {
-    min-width: 128px; padding: 6px 10px; border-radius: var(--radius-sm);
-    background: var(--surface); border: 1px solid var(--border); text-align: right;
+  .cp-detail-rs { flex: 1; margin: 0; font-size: 15px; font-weight: 700; color: var(--gold-dark); }
+  .cp-detail-rs:focus { outline: none; }
+  .cp-back { display: none; }
+  .cp-close {
+    width: 32px; height: 32px; flex-shrink: 0; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface); color: var(--text-muted); font-size: 20px; line-height: 1; cursor: pointer;
   }
-  .cp-price-label { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-dim); }
-  .cp-price-value { font-size: 13px; font-weight: 700; color: var(--gold-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .cp-price-none { font-size: 12px; font-style: italic; color: var(--text-dim); white-space: nowrap; }
-  .cp-chevron { font-size: 12px; color: var(--text-muted); transition: transform 0.15s; flex-shrink: 0; }
-  .cp-card.open .cp-chevron { transform: rotate(180deg); }
-  .cp-body { border-top: 1px solid var(--border); padding: 12px 18px 16px; }
-  .cp-table-wrap { box-shadow: none; }
-  .cp-table th, .cp-table td { padding: 7px 12px; font-size: 12px; }
-  .cp-table tr.cp-group-row td {
-    background: var(--card-2); font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
-    text-transform: uppercase; color: var(--gold);
+  .cp-close:hover, .cp-back:hover { color: var(--text); border-color: var(--border-mid); }
+  .cp-facts {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 20px 0 24px;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
   }
-  .cp-table tbody tr.cp-group-row:hover { box-shadow: none; }
+  .cp-fact { padding: 12px 16px 12px 0; }
+  .cp-fact + .cp-fact { padding-left: 16px; border-left: 1px solid var(--border); }
+  .cp-fact dt { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  .cp-fact dd { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
+  .cp-detail-h3 { font-size: 14px; font-weight: 700; color: var(--text); margin: 0 0 10px; }
+  .cp-count { font-weight: 400; color: var(--text-muted); }
+  .cp-prices-detail { margin-bottom: 24px; }
+  .cp-prices-detail .cp-price { flex: 1 1 0; padding: 0 16px; text-align: left; }
+  .cp-prices-detail .cp-price:first-child { padding-left: 0; }
+  .cp-prices-detail .cp-price dt { font-size: 12px; margin-bottom: 2px; }
+  .cp-prices-detail .cp-price dd { font-size: 20px; }
+
+  /* Tabel rincian: garis di setiap sel */
+  .cp-table-wrap { overflow-x: auto; }
+  .cp-table { width: 100%; min-width: 0; border-collapse: collapse; font-size: 13px; }
+  .cp-table th, .cp-table td {
+    border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top;
+    font-family: var(--font-body); letter-spacing: 0; text-transform: none; white-space: normal;
+  }
+  .cp-table thead th { background: var(--surface); font-size: 12px; font-weight: 700; color: var(--text); }
+  .cp-table .right { text-align: right; }
+  .cp-col-item { width: 42%; }
+  .cp-col-qty { width: 64px; }
+  .cp-table td.right { font-variant-numeric: tabular-nums; }
+  .cp-table tr.cp-group-row th { background: var(--card-2); font-size: 12px; font-weight: 700; color: var(--gold-dark); }
+  .cp-table tbody tr { transition: none; }
+  .cp-table tbody tr:hover { background: none; box-shadow: none; }
   .cp-ket { color: var(--text-muted); }
   .cp-loading { padding: 14px; text-align: center; font-size: 12px; color: var(--text-muted); }
   .cp-loading .spinner { display: inline-block; }
+
+  /* Layar sedang/sempit: panel menggantikan daftar, dengan tombol kembali */
+  @media (max-width: 900px) {
+    .cp-layout.has-detail { grid-template-columns: minmax(0, 1fr); }
+    .cp-layout.has-detail .cp-list { display: none; }
+    .cp-detail { position: static; max-height: none; overflow: visible; padding: 0 16px 20px; }
+    .cp-detail-bar { margin: 0 -16px; padding: 10px 16px; }
+    .cp-back {
+      display: inline-block; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--text-muted); font-family: var(--font-body); font-size: 12px; cursor: pointer;
+    }
+    .cp-close { display: none; }
+    .cp-detail-rs { text-align: right; }
+    .cp-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cp-fact:nth-child(3) { padding-left: 0; border-left: none; }
+    .cp-fact:nth-child(n+3) { border-top: 1px solid var(--border); }
+  }
 
   /* ─── RESPONSIVE ──────────────────────────────────── */
   @media (max-width: 680px) {
@@ -1054,10 +1115,17 @@ export const styles = `
     .kn-group, .kn-axis { grid-template-columns: 96px 1fr; gap: 8px; }
     .kn-panel { padding: 14px 12px 12px; }
     .kn-tick:not(.zero):not(:first-child):not(:last-child) { display: none; }
-    .cp-head { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
-    .cp-title-wrap { flex-basis: calc(100% - 28px); }
-    .cp-prices { width: 100%; order: 3; flex-wrap: wrap; }
-    .cp-price { flex: 1 1 30%; min-width: 0; text-align: left; }
-    .cp-body { padding: 10px 12px 14px; }
+    .cp-card { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
+    .cp-prices { border-top: 1px solid var(--border); padding-top: 8px; }
+    .cp-price { flex: 1 1 0; min-width: 0; padding: 0 8px; text-align: left; }
+    .cp-price:first-child { padding-left: 0; }
+    .cp-price dd { font-size: 13px; }
+    .cp-fact dd { font-size: 16px; }
+    .cp-prices-detail { flex-direction: column; }
+    .cp-prices-detail .cp-price {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 8px 0; border-left: none; border-bottom: 1px solid var(--border);
+    }
+    .cp-prices-detail .cp-price dd { font-size: 16px; }
   }
 `;

@@ -1,11 +1,13 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { API, formatRupiah } from "../lib/utils.jsx";
 import { MultiSelectDropdown } from "../components/MultiSelectDropdown.jsx";
 
 // ─── ClinicalPathwayView ────────────────────────────────────────────
 // Tab "Clinical Pathway": harga paket perawatan per rumah sakit × diagnosis ×
 // medical treatment, satu card per kombinasi, dengan harga total tiap kelas
-// dan LOS. Card dibuka untuk melihat rinciannya (diambil saat dibuka).
+// dan LOS. Memilih card membuka panel detail di kanan (daftar card menyempit
+// ke kiri); rinciannya diambil saat panel dibuka. Di layar sempit panel
+// menggantikan daftar, dengan tombol kembali.
 // Data di project Supabase golongan (sql/golongan/04_clinical_pathway.sql),
 // di-upload dengan scripts/upload_clinical_pathway.py.
 
@@ -52,7 +54,7 @@ export default function ClinicalPathwayView() {
   const [selRS, setSelRS] = useState(NONE);
   const [selDiag, setSelDiag] = useState(NONE);
   const [selMT, setSelMT] = useState(NONE);
-  const [open, setOpen] = useState(() => new Set());        // ids of expanded cards
+  const [selectedId, setSelectedId] = useState(null);
   const [rincian, setRincian] = useState(() => new Map());  // id -> { data, error }
 
   const filters = useApi(`${API}/clinical-pathway/filters`);
@@ -88,17 +90,29 @@ export default function ClinicalPathwayView() {
       .catch(err => setRincian(prev => new Map(prev).set(id, { data: null, error: err.message })));
   }, []);
 
-  const toggle = (id) => {
-    setOpen(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+  const list = cards.data ?? NONE;
+  // Card yang terbuka hilang dari daftar (filter berubah) -> panel ikut tertutup.
+  const selected = list.find(c => c.id === selectedId) ?? null;
+
+  const open = (id) => {
+    setSelectedId(id);
     const r = rincian.get(id);
     if (!r || r.error) loadRincian(id);
   };
+  const close = useCallback(() => {
+    const id = selectedId;
+    setSelectedId(null);
+    // fokus kembali ke card yang tadi dibuka
+    requestAnimationFrame(() => document.getElementById(`cp-card-${id}`)?.focus());
+  }, [selectedId]);
 
-  const list = cards.data ?? NONE;
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [selected, close]);
+
   const resetFilters = () => { setSelRS(NONE); setSelDiag(NONE); setSelMT(NONE); };
 
   return (
@@ -119,7 +133,7 @@ export default function ClinicalPathwayView() {
           )}
         </div>
         <p className="kn-note">
-          Harga total paket per kelas. Buka card untuk melihat rincian kegiatan, item, dan jumlahnya.
+          Harga total paket per kelas. Pilih paket untuk melihat rincian kegiatan, item, dan jumlahnya.
         </p>
       </div>
 
@@ -135,13 +149,18 @@ export default function ClinicalPathwayView() {
           </div>
           {cards.data && !list.length && (
             <div className="state-box"><div className="state-title">Tidak ada paket</div>
-              <div className="state-sub">Tidak ada paket untuk kombinasi filter ini.</div></div>
+              <div className="state-sub">Tidak ada paket untuk kombinasi filter ini. Hapus salah satu filter untuk melihat paket lain.</div></div>
           )}
-          <div className={`cp-list ${cards.loading ? 'kn-stale' : ''}`}>
-            {list.map(c => (
-              <PathwayCard key={c.id} card={c} isOpen={open.has(c.id)} onToggle={() => toggle(c.id)}
-                rincian={rincian.get(c.id)} onRetry={() => loadRincian(c.id)} />
-            ))}
+          <div className={`cp-layout ${selected ? 'has-detail' : ''}`}>
+            <div className={`cp-list ${cards.loading ? 'kn-stale' : ''}`}>
+              {list.map(c => (
+                <PathwayCard key={c.id} card={c} selected={c.id === selectedId} onOpen={() => open(c.id)} />
+              ))}
+            </div>
+            {selected && (
+              <DetailPanel key={selected.id} card={selected} rincian={rincian.get(selected.id)}
+                onRetry={() => loadRincian(selected.id)} onClose={close} />
+            )}
           </div>
         </>
       )}
@@ -158,38 +177,69 @@ function ErrorBox({ message }) {
   );
 }
 
-function PathwayCard({ card, isOpen, onToggle, rincian, onRetry }) {
-  const bodyId = `cp-body-${card.id}`;
+// paket medis tanpa tindakan khusus: diagnosis jadi judulnya
+const titleOf = (c) => c.medical_treatment || c.diagnosis;
+
+function Prices({ harga, className }) {
   return (
-    <section className={`cp-card ${isOpen ? 'open' : ''}`}>
-      <button className="cp-head" onClick={onToggle} aria-expanded={isOpen} aria-controls={bodyId}>
-        <div className="cp-title-wrap">
-          <div className="cp-rs">{card.rumah_sakit}</div>
-          {/* paket medis tanpa tindakan khusus: diagnosis jadi judulnya */}
-          <div className="cp-title">{card.medical_treatment || card.diagnosis}</div>
-          <div className="cp-sub">
-            {card.medical_treatment && <span>{card.diagnosis}</span>}
-            {card.icd10 && <span className="cp-chip">ICD {card.icd10}</span>}
-            {card.los != null && <span className="cp-chip">LOS {card.los} hari</span>}
-          </div>
+    <dl className={className}>
+      {harga.map(h => (
+        <div key={h.kelas} className="cp-price">
+          <dt>{kelasLabel(h.kelas)}</dt>
+          <dd>{Number(h.tarif) > 0 ? fmtHarga(h.tarif) : <span className="cp-price-none">Belum tersedia</span>}</dd>
         </div>
-        <div className="cp-prices">
-          {card.harga.map(h => (
-            <div key={h.kelas} className="cp-price">
-              <div className="cp-price-label">{kelasLabel(h.kelas)}</div>
-              {Number(h.tarif) > 0
-                ? <div className="cp-price-value">{fmtHarga(h.tarif)}</div>
-                : <div className="cp-price-none">Belum tersedia</div>}
-            </div>
-          ))}
-        </div>
-        <span className="cp-chevron" aria-hidden="true">▾</span>
-      </button>
-      {isOpen && (
-        <div className="cp-body" id={bodyId}>
-          <Rincian state={rincian} onRetry={onRetry} />
-        </div>
-      )}
+      ))}
+    </dl>
+  );
+}
+
+function PathwayCard({ card, selected, onOpen }) {
+  const meta = [card.medical_treatment && card.diagnosis, card.icd10 && `ICD ${card.icd10}`,
+    card.los != null && `LOS ${card.los} hari`].filter(Boolean);
+  return (
+    <button id={`cp-card-${card.id}`} className={`cp-card ${selected ? 'selected' : ''}`}
+      onClick={onOpen} aria-pressed={selected} aria-controls={selected ? 'cp-detail' : undefined}>
+      <span className="cp-card-text">
+        <span className="cp-rs">{card.rumah_sakit}</span>
+        <span className="cp-title">{titleOf(card)}</span>
+        <span className="cp-meta">{meta.join(' · ')}</span>
+      </span>
+      {/* harga paket yang sedang dibuka pindah ke panel detail */}
+      {!selected && <Prices harga={card.harga} className="cp-prices" />}
+    </button>
+  );
+}
+
+function DetailPanel({ card, rincian, onRetry, onClose }) {
+  const headingRef = useRef(null);
+  useEffect(() => {
+    headingRef.current?.focus({ preventScroll: true });
+    headingRef.current?.scrollIntoView({ block: 'nearest' });
+  }, []);
+  const facts = [
+    ['Diagnosis', card.diagnosis],
+    ['Medical Treatment', card.medical_treatment || '—'],
+    ['ICD 10', card.icd10 || '—'],
+    ['LOS', card.los != null ? `${card.los} hari` : '—'],
+  ];
+  return (
+    <section id="cp-detail" className="cp-detail" aria-labelledby="cp-detail-title">
+      <div className="cp-detail-bar">
+        <button className="cp-back" onClick={onClose}>← Kembali ke daftar</button>
+        <h2 id="cp-detail-title" className="cp-detail-rs" ref={headingRef} tabIndex={-1}>{card.rumah_sakit}</h2>
+        <button className="cp-close" onClick={onClose} aria-label="Tutup detail">×</button>
+      </div>
+      <dl className="cp-facts">
+        {facts.map(([label, value]) => (
+          <div key={label} className="cp-fact"><dt>{label}</dt><dd>{value}</dd></div>
+        ))}
+      </dl>
+      <h3 className="cp-detail-h3">Harga paket</h3>
+      <Prices harga={card.harga} className="cp-prices cp-prices-detail" />
+      <h3 className="cp-detail-h3">
+        Rincian{rincian?.data ? <span className="cp-count"> · {rincian.data.length} item</span> : null}
+      </h3>
+      <Rincian state={rincian} onRetry={onRetry} />
     </section>
   );
 }
@@ -211,14 +261,15 @@ function Rincian({ state, onRetry }) {
     else groups.push({ kegiatan: r.kegiatan, rows: [r] });
   }
   return (
-    <div className="table-wrap cp-table-wrap">
-      <table className="kn-table cp-table">
+    <div className="cp-table-wrap">
+      <table className="cp-table">
+        <colgroup><col className="cp-col-item" /><col /><col className="cp-col-qty" /></colgroup>
         <thead>
-          <tr><th>Item</th><th>Keterangan</th><th className="right">QTY</th></tr>
+          <tr><th scope="col">Item</th><th scope="col">Keterangan</th><th scope="col" className="right">QTY</th></tr>
         </thead>
         <tbody>
           {groups.map((g, gi) => [
-            <tr key={`g${gi}`} className="cp-group-row"><td colSpan={3}>{g.kegiatan || '—'}</td></tr>,
+            <tr key={`g${gi}`} className="cp-group-row"><th scope="rowgroup" colSpan={3}>{g.kegiatan || '—'}</th></tr>,
             ...g.rows.map((r, ri) => (
               <tr key={`${gi}-${ri}`}>
                 <td>{r.item || '—'}</td>
