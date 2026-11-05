@@ -34,7 +34,7 @@ frontend/test/*.test.js       npm test (node --test)
 sql/shard/        01_schema → 02_rpc → 03_shard_stats → 04_security (run in order)
                   05_strict_unique: one-off for shards created before it (01 has it built in)
 sql/shard/runbook-reclaim-space.md
-scripts/upload_tarif.py       CSV upload; picks the shard per hospital (SHARD_n_SERVICE_KEY)
+scripts/upload_tarif.py       CSV/Excel upload; picks the shard per hospital (SHARD_n_SERVICE_KEY)
 scripts/move-hospital.js      move hospitals between shards (needs DATABASE_URL_n)
 sql/golongan/     01_schema → 02_rpc → 03_security  (golongan operasi project)
                   04_clinical_pathway: Clinical Pathway tables + RPCs (same project)

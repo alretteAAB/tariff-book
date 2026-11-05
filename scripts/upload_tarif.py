@@ -1,11 +1,11 @@
-"""Upload data tarif dari CSV ke shard Supabase yang tepat.
+"""Upload data tarif dari CSV atau Excel (.xlsx, sheet pertama) ke shard Supabase yang tepat.
 
     cd scripts
     pip install supabase pandas
     python upload_tarif.py data_tarif_baru.csv --dry-run   # cek dulu: RS mana ke shard mana
     python upload_tarif.py data_tarif_baru.csv
 
-Kolom CSV: rumah_sakit, group_non_group, nama_group, kategori_harga,
+Kolom: rumah_sakit, group_non_group, nama_group, kategori_harga,
 nama_layanan, kelas_kamar, tahun, tarif, pct_increase (opsional).
 
 Aturan shard:
@@ -192,18 +192,37 @@ class ShardWriter:
         self.db = client
         self.cache = {"rumah_sakit_ref": {}, "kategori_ref": {}, "kelas_kamar_ref": {}, "layanan_ref": {}}
 
+    def resolve_ids(self, table: str, names: list, bar=None) -> None:
+        """Isi cache id untuk semua nama sekaligus, 500 nama per request.
+
+        Upsert pada kolom unik `nama`: nama baru dibuat, nama yang sudah ada
+        (mis. layanan yang sama dari RS lain di shard ini) dikembalikan id-nya.
+        Nama dikirim di body JSON, bukan lewat URL seperti `.eq("nama", ...)`,
+        yang bisa meleset untuk nama tertentu lalu insert-nya gagal dengan
+        "duplicate key value violates unique constraint layanan_ref_nama_key".
+        """
+        cache = self.cache[table]
+        todo = [n for n in dict.fromkeys(names) if n is not None and n not in cache]
+        for i in range(0, len(todo), BATCH_SIZE):
+            chunk = todo[i:i + BATCH_SIZE]
+            # kolom nama bertipe text: angka dari Excel (mis. 123) kembali sebagai "123"
+            sent = {str(n): n for n in chunk}
+            rows = self.db.table(table).upsert([{"nama": t} for t in sent], on_conflict="nama").execute().data
+            for r in rows:
+                if r["nama"] in sent:
+                    cache[sent[r["nama"]]] = r["id"]
+            if bar:
+                bar.add(len(chunk))
+        missing = [n for n in todo if n not in cache]
+        if missing:
+            sys.exit(f"{table}: id tidak didapat untuk {len(missing)} nama, mis. {missing[0]!r}")
+
     def get_or_create_id(self, table: str, nama):
         if nama is None:
             return None
-        cache = self.cache[table]
-        if nama in cache:
-            return cache[nama]
-        res = self.db.table(table).select("id").eq("nama", nama).execute()
-        if res.data:
-            cache[nama] = res.data[0]["id"]
-        else:
-            cache[nama] = self.db.table(table).insert({"nama": nama}).execute().data[0]["id"]
-        return cache[nama]
+        if nama not in self.cache[table]:
+            self.resolve_ids(table, [nama])
+        return self.cache[table][nama]
 
     def upsert_rumahsakit(self, rs: str, group_non_group, nama_group) -> None:
         # display_name RS yang sudah ada tidak ditimpa (banyak yang sudah dirapikan
@@ -225,18 +244,17 @@ class ShardWriter:
             self.db.table("room_class_mapping").upsert(rows, on_conflict="room_class").execute()
 
     def insert_tarif(self, df: pd.DataFrame) -> int:
-        # Fase 1: nama -> id. Nama yang belum dikenal butuh 1-2 request per nama,
-        # jadi untuk RS dengan ribuan layanan fase ini bisa beberapa menit.
+        # Fase 1: nama -> id, 500 nama per request
         columns = {"rumah_sakit_ref": "rumah_sakit", "kategori_ref": "kategori_harga",
                    "kelas_kamar_ref": "kelas_kamar", "layanan_ref": "nama_layanan"}
-        todo = [(table, nama) for table, col in columns.items()
-                for nama in dict.fromkeys(clean(v) for v in df[col])
-                if nama is not None and nama not in self.cache[table]]
-        if todo:
-            bar = Progress("Mencocokkan nama", len(todo))
-            for table, nama in todo:
-                self.get_or_create_id(table, nama)
-                bar.add()
+        todo = {table: [n for n in dict.fromkeys(clean(v) for v in df[col])
+                        if n is not None and n not in self.cache[table]]
+                for table, col in columns.items()}
+        total = sum(len(v) for v in todo.values())
+        if total:
+            bar = Progress("Mencocokkan nama", total)
+            for table, names in todo.items():
+                self.resolve_ids(table, names, bar)
             bar.finish()
 
         # Fase 2: kirim baris (semua id sudah ada di cache)
@@ -286,7 +304,10 @@ def main() -> None:
     from supabase import create_client
     clients = {sid: create_client(url, key) for sid, (url, key) in shard_config().items()}
 
-    df = pd.read_csv(args.csv)
+    if Path(args.csv).suffix.lower() in (".xlsx", ".xls"):
+        df = pd.read_excel(args.csv)
+    else:
+        df = pd.read_csv(args.csv)
     df["rumah_sakit"] = df["rumah_sakit"].astype(str).str.strip()
     rows_per_rs = df.groupby("rumah_sakit").size().to_dict()
 
