@@ -334,14 +334,19 @@ clinical pathway files). They live in the golongan project too, so no new keys.
 
 Once: in the golongan project's SQL Editor, run `sql/golongan/04_clinical_pathway.sql`.
 
-Upload (or update) the Excel files:
+Upload (or update) the Excel file(s); put them in `scripts/` but do not commit them:
 ```bash
 cd scripts
-python upload_clinical_pathway.py g1v2.xlsx g2v2.xlsx g3v2.xlsx --dry-run
-python upload_clinical_pathway.py g1v2.xlsx g2v2.xlsx g3v2.xlsx
+python upload_clinical_pathway.py "Sampling_Tarif_Gabungan.xlsx" --dry-run
+python upload_clinical_pathway.py "Sampling_Tarif_Gabungan.xlsx"
 ```
-- Hospital name = "Mitra Keluarga " + CABANG; for another hospital group use
-  `--rs-prefix "Nama Grup"`.
+- Combined file (columns Treatment Place, DIAGNOSIS, Medical Treatment, Diagnose
+  Id, ...): the hospital name is taken from Treatment Place as written
+  ("RS Mitra Keluarga Waru"). Medical Treatment may be empty (medical packages);
+  those cards use the diagnosis as their title.
+- Older per-group files (g1v2/g2v2/g3v2, column CABANG) still work: the hospital
+  name is "Mitra Keluarga " + CABANG, or `--rs-prefix "Nama Grup"` + CABANG.
+  Use one layout consistently: the two give different hospital names.
 - Each hospital in the files is **replaced** as a whole (old cards of that
   hospital are removed first), so uploading the same files again changes nothing.
 - The script stops before writing if the items of a package differ between

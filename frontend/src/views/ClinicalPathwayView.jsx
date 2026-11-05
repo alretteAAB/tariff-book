@@ -165,9 +165,10 @@ function PathwayCard({ card, isOpen, onToggle, rincian, onRetry }) {
       <button className="cp-head" onClick={onToggle} aria-expanded={isOpen} aria-controls={bodyId}>
         <div className="cp-title-wrap">
           <div className="cp-rs">{card.rumah_sakit}</div>
-          <div className="cp-title">{card.medical_treatment}</div>
+          {/* paket medis tanpa tindakan khusus: diagnosis jadi judulnya */}
+          <div className="cp-title">{card.medical_treatment || card.diagnosis}</div>
           <div className="cp-sub">
-            <span>{card.diagnosis}</span>
+            {card.medical_treatment && <span>{card.diagnosis}</span>}
             {card.icd10 && <span className="cp-chip">ICD {card.icd10}</span>}
             {card.los != null && <span className="cp-chip">LOS {card.los} hari</span>}
           </div>
