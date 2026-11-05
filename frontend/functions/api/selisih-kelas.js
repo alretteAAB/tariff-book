@@ -1,4 +1,4 @@
-import { parseMulti, json } from './_supabase.js';
+import { parseList, json } from './_supabase.js';
 import { pickShards, callShards, partialInfo } from './_shards.js';
 import { buildSelisihKelas } from './_kenaikan.js';
 import kategoriBesar from './_kategori_besar.json';
@@ -15,7 +15,7 @@ export async function onRequestGet({ request, env }) {
     return json(buildSelisihKelas(null, kategoriBesar));
   }
 
-  const shards = await pickShards(env, parseMulti(p, 'rumah_sakit'));
+  const shards = await pickShards(env, parseList(p, 'rumah_sakit'));
   const { ok, failed } = await callShards(shards, 'selisih_kelas_tarif', { f_rumah_sakit, f_tahun, f_kelas });
   if (!ok.length) return json({ error: failed[0].error }, 500);
 

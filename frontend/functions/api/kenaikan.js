@@ -1,4 +1,4 @@
-import { parseMulti, json } from './_supabase.js';
+import { parseList, parseMulti, json } from './_supabase.js';
 import { pickShards, callShards, partialInfo } from './_shards.js';
 import { buildKenaikan } from './_kenaikan.js';
 import kategoriBesar from './_kategori_besar.json';
@@ -7,7 +7,7 @@ import kategoriBesar from './_kategori_besar.json';
 // Price increase per kategori besar, each selected year vs the next one.
 export async function onRequestGet({ request, env }) {
   const p = new URL(request.url).searchParams;
-  const f_rumah_sakit = parseMulti(p, 'rumah_sakit');
+  const f_rumah_sakit = parseList(p, 'rumah_sakit');
   const f_tahun = parseMulti(p, 'tahun')?.map(Number).filter(Number.isInteger) ?? [];
   if (!f_rumah_sakit || f_tahun.length < 2) {
     return json({ periods: [], kategori: kategoriBesar.kategori_besar, rows: [], unmapped: [] });

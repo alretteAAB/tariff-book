@@ -1,4 +1,4 @@
-import { parseMulti, json } from './_supabase.js';
+import { parseList, parseMulti, json } from './_supabase.js';
 import { pickShards, callShards, partialInfo } from './_shards.js';
 import { mergeSorted } from './_merge.js';
 
@@ -12,10 +12,10 @@ const stripCount = (rows) => rows.map(({ total_count, ...r }) => r);
 export async function onRequestGet({ request, env }) {
   const p = new URL(request.url).searchParams;
   const q = (p.get('q') || '').trim() || null;
-  const f_kategori    = parseMulti(p, 'kategori');
-  const f_rumah_sakit = parseMulti(p, 'rumah_sakit');
+  const f_kategori    = parseList(p, 'kategori');
+  const f_rumah_sakit = parseList(p, 'rumah_sakit');
   const f_tahun       = parseMulti(p, 'tahun')?.map(Number) ?? null;
-  const f_kelas       = parseMulti(p, 'kelas_kamar');
+  const f_kelas       = parseList(p, 'kelas_kamar');
   const sort = p.get('sort') || null;
   const page = Math.max(1, parseInt(p.get('page')) || 1);
 

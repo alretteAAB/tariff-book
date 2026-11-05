@@ -1,4 +1,4 @@
-import { parseMulti, json } from './_supabase.js';
+import { parseList, parseMulti, json } from './_supabase.js';
 import { pickShards, callShards, partialInfo } from './_shards.js';
 
 const COMPARE_ROW_MAX = 500; // batas baris hasil pivot yang dikirim ke UI
@@ -10,10 +10,10 @@ export async function onRequestGet({ request, env }) {
   const axis = FIELDS.includes(p.get('axis')) ? p.get('axis') : 'rumah_sakit';
 
   const q = (p.get('q') || '').trim() || null;
-  const f_kategori    = parseMulti(p, 'kategori');
-  const f_rumah_sakit = parseMulti(p, 'rumah_sakit');
+  const f_kategori    = parseList(p, 'kategori');
+  const f_rumah_sakit = parseList(p, 'rumah_sakit');
   const f_tahun       = parseMulti(p, 'tahun')?.map(Number) ?? null;
-  const f_kelas       = parseMulti(p, 'kelas_kamar');
+  const f_kelas       = parseList(p, 'kelas_kamar');
 
   const hasAny = Boolean(q) || f_kategori || f_rumah_sakit || f_tahun || f_kelas;
   if (!hasAny) return json({ axis, columns: [], rows: [], total: 0, truncated: false });

@@ -1,4 +1,4 @@
-import { parseMulti, json } from '../_supabase.js';
+import { parseList, json } from '../_supabase.js';
 import { golonganClient } from '../_golongan.js';
 
 const PAGE_SIZE = 50;
@@ -10,9 +10,9 @@ export async function onRequestGet({ request, env }) {
   try {
     const { data, error } = await golonganClient(env).rpc('search_golongan', {
       q: (p.get('q') || '').trim() || null,
-      f_rumah_sakit: parseMulti(p, 'rumah_sakit'),
-      f_specialty:   parseMulti(p, 'specialty'),
-      f_golongan:    parseMulti(p, 'golongan'),
+      f_rumah_sakit: parseList(p, 'rumah_sakit'),
+      f_specialty:   parseList(p, 'specialty'),
+      f_golongan:    parseList(p, 'golongan'),
       sort: p.get('sort') || null,
       page,
       page_size: PAGE_SIZE,
