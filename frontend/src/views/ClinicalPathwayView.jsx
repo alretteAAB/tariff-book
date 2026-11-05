@@ -177,9 +177,6 @@ function ErrorBox({ message }) {
   );
 }
 
-// paket medis tanpa tindakan khusus: diagnosis jadi judulnya
-const titleOf = (c) => c.medical_treatment || c.diagnosis;
-
 function Prices({ harga, className }) {
   return (
     <dl className={className}>
@@ -194,21 +191,21 @@ function Prices({ harga, className }) {
 }
 
 function PathwayCard({ card, selected, onOpen }) {
-  // diagnosis sudah jadi judul kalau paketnya tanpa medical treatment
+  // satu baris kolom: Medical Treatment | Diagnosis | ICD 10 | LOS
   const fields = [
-    card.medical_treatment && ['Diagnosis', card.diagnosis, 'diag'],
-    card.icd10 && ['ICD 10', card.icd10],
-    card.los != null && ['LOS', `${card.los} hari`],
-  ].filter(Boolean);
+    ['Medical Treatment', card.medical_treatment || '—', 'cp-field-mt'],
+    ['Diagnosis', card.diagnosis, 'cp-field-diag'],
+    ['ICD 10', card.icd10 || '—', 'cp-field-icd'],
+    ['LOS', card.los != null ? `${card.los} hari` : '—', 'cp-field-los'],
+  ];
   return (
     <button id={`cp-card-${card.id}`} className={`cp-card ${selected ? 'selected' : ''}`}
       onClick={onOpen} aria-pressed={selected} aria-controls={selected ? 'cp-detail' : undefined}>
       <span className="cp-card-text">
         <span className="cp-rs">{card.rumah_sakit}</span>
-        <span className="cp-title">{titleOf(card)}</span>
         <span className="cp-fields">
-          {fields.map(([label, value, kind]) => (
-            <span key={label} className={`cp-field ${kind === 'diag' ? 'cp-field-diag' : ''}`}>
+          {fields.map(([label, value, cls]) => (
+            <span key={label} className={`cp-field ${cls}`}>
               <span className="cp-field-label">{label}</span>
               <span className="cp-field-value">{value}</span>
             </span>
@@ -228,8 +225,8 @@ function DetailPanel({ card, rincian, onRetry, onClose }) {
     headingRef.current?.scrollIntoView({ block: 'nearest' });
   }, []);
   const facts = [
-    ['Diagnosis', card.diagnosis],
     ['Medical Treatment', card.medical_treatment || '—'],
+    ['Diagnosis', card.diagnosis],
     ['ICD 10', card.icd10 || '—'],
     ['LOS', card.los != null ? `${card.los} hari` : '—'],
   ];

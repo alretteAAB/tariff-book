@@ -1011,15 +1011,20 @@ export const styles = `
   .cp-card.selected { border-color: var(--gold); background: var(--gold-dim); }
   .cp-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .cp-rs { font-size: 12px; font-weight: 600; color: var(--gold); }
-  .cp-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
-  /* Diagnosis | ICD 10 | LOS berjejer seperti kolom tabel */
-  .cp-fields { display: flex; flex-wrap: wrap; margin-top: 6px; }
-  .cp-field { display: flex; flex-direction: column; gap: 1px; padding: 0 14px; border-left: 1px solid var(--border); }
+  /* Medical Treatment | Diagnosis | ICD 10 | LOS: kolom dengan lebar sama di semua card */
+  .cp-fields {
+    display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 76px 64px;
+    margin-top: 4px;
+  }
+  .cp-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 0 14px; border-left: 1px solid var(--border); }
   .cp-field:first-child { padding-left: 0; border-left: none; }
-  .cp-field-diag { flex: 0 1 auto; min-width: 0; }
   .cp-field-label { font-size: 11px; color: var(--text-muted); }
-  .cp-field-value { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
-  .cp-field-diag .cp-field-value { white-space: normal; }
+  .cp-field-value { font-size: 13px; font-weight: 600; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
+  .cp-field-mt .cp-field-value { font-size: 15px; font-weight: 700; }
+  .cp-field-icd .cp-field-value, .cp-field-los .cp-field-value { white-space: nowrap; }
+  /* daftar sempit (panel terbuka) dan HP: 2 x 2 */
+  .cp-layout.has-detail .cp-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 8px; }
+  .cp-layout.has-detail .cp-field:nth-child(3) { padding-left: 0; border-left: none; }
 
   /* Harga per kelas: di card (kanan, atau di bawah saat daftar menyempit) dan di panel */
   .cp-prices { display: flex; gap: 0; margin: 0; flex-shrink: 0; }
@@ -1028,6 +1033,11 @@ export const styles = `
   .cp-price dt { font-size: 11px; color: var(--text-muted); }
   .cp-price dd { margin: 0; font-size: 14px; font-weight: 700; color: var(--gold-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .cp-price-none { font-size: 12px; font-weight: 400; font-style: italic; color: var(--text-dim); }
+  /* lebar harga tetap supaya kolom Treatment | Diagnosis | ICD | LOS sejajar antar card */
+  @media (min-width: 681px) {
+    .cp-layout:not(.has-detail) .cp-prices { min-width: 450px; justify-content: flex-end; }
+    .cp-layout:not(.has-detail) .cp-price { width: 150px; box-sizing: border-box; }
+  }
   .cp-layout.has-detail .cp-card { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
   .cp-layout.has-detail .cp-card .cp-prices { flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 8px; }
   .cp-layout.has-detail .cp-card .cp-price { flex: 1 1 0; min-width: 0; padding: 0 10px; text-align: left; }
@@ -1123,6 +1133,8 @@ export const styles = `
     .kn-panel { padding: 14px 12px 12px; }
     .kn-tick:not(.zero):not(:first-child):not(:last-child) { display: none; }
     .cp-card { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
+    .cp-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 8px; }
+    .cp-field:nth-child(3) { padding-left: 0; border-left: none; }
     .cp-prices { border-top: 1px solid var(--border); padding-top: 8px; }
     .cp-price { flex: 1 1 0; min-width: 0; padding: 0 8px; text-align: left; }
     .cp-price:first-child { padding-left: 0; }
