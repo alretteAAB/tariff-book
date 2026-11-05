@@ -994,6 +994,50 @@ export const styles = `
   .kn-stats-table th.kn-sticky { background: var(--surface); }
   .kn-stats-table td.kn-sticky { background: var(--card); }
 
+  /* ─── CLINICAL PATHWAY ────────────────────────────── */
+  .cp-list { display: flex; flex-direction: column; gap: 10px; }
+  .cp-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+  }
+  .cp-card.open { border-color: var(--border-mid); }
+  .cp-head {
+    width: 100%; display: flex; align-items: center; gap: 18px;
+    padding: 14px 18px; background: none; border: none; cursor: pointer;
+    text-align: left; font-family: var(--font-body); color: var(--text);
+  }
+  .cp-head:hover { background: var(--gold-dim); }
+  .cp-head:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+  .cp-title-wrap { flex: 1; min-width: 0; }
+  .cp-rs { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--gold); }
+  .cp-title { font-size: 15px; font-weight: 700; margin-top: 2px; line-height: 1.3; }
+  .cp-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 4px; font-size: 12px; color: var(--text-muted); }
+  .cp-chip {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.3px; padding: 2px 7px;
+    border-radius: 10px; background: var(--card-2); border: 1px solid var(--border); color: var(--text-muted);
+  }
+  .cp-prices { display: flex; gap: 6px; flex-shrink: 0; }
+  .cp-price {
+    min-width: 128px; padding: 6px 10px; border-radius: var(--radius-sm);
+    background: var(--surface); border: 1px solid var(--border); text-align: right;
+  }
+  .cp-price-label { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-dim); }
+  .cp-price-value { font-size: 13px; font-weight: 700; color: var(--gold-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cp-price-none { font-size: 12px; font-style: italic; color: var(--text-dim); white-space: nowrap; }
+  .cp-chevron { font-size: 12px; color: var(--text-muted); transition: transform 0.15s; flex-shrink: 0; }
+  .cp-card.open .cp-chevron { transform: rotate(180deg); }
+  .cp-body { border-top: 1px solid var(--border); padding: 12px 18px 16px; }
+  .cp-table-wrap { box-shadow: none; }
+  .cp-table th, .cp-table td { padding: 7px 12px; font-size: 12px; }
+  .cp-table tr.cp-group-row td {
+    background: var(--card-2); font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--gold);
+  }
+  .cp-table tbody tr.cp-group-row:hover { box-shadow: none; }
+  .cp-ket { color: var(--text-muted); }
+  .cp-loading { padding: 14px; text-align: center; font-size: 12px; color: var(--text-muted); }
+  .cp-loading .spinner { display: inline-block; }
+
   /* ─── RESPONSIVE ──────────────────────────────────── */
   @media (max-width: 680px) {
     .header { padding: 14px 18px; }
@@ -1005,9 +1049,15 @@ export const styles = `
     .header-title { font-size: 20px; }
     .header { flex-wrap: wrap; }
     .nav-tabs { width: 100%; margin-left: 0; }
-    .nav-tab { flex: 1; padding: 7px 8px; text-align: center; }
+    .nav-tabs { flex-wrap: wrap; }
+    .nav-tab { flex: 1 1 45%; padding: 7px 8px; text-align: center; }
     .kn-group, .kn-axis { grid-template-columns: 96px 1fr; gap: 8px; }
     .kn-panel { padding: 14px 12px 12px; }
     .kn-tick:not(.zero):not(:first-child):not(:last-child) { display: none; }
+    .cp-head { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+    .cp-title-wrap { flex-basis: calc(100% - 28px); }
+    .cp-prices { width: 100%; order: 3; flex-wrap: wrap; }
+    .cp-price { flex: 1 1 30%; min-width: 0; text-align: left; }
+    .cp-body { padding: 10px 12px 14px; }
   }
 `;

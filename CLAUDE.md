@@ -29,6 +29,7 @@ frontend/functions/api/
   _kategori_besar.json  kategori_harga → 5 kategori besar (generated, see below)
   _golongan.js   client for the golongan project (GOLONGAN_URL / GOLONGAN_KEY)
   golongan/index.js  golongan/filters.js   → /api/golongan, /api/golongan/filters
+  clinical-pathway/index.js  filters.js  rincian.js → /api/clinical-pathway[/filters|/rincian]
 frontend/test/*.test.js       npm test (node --test)
 sql/shard/        01_schema → 02_rpc → 03_shard_stats → 04_security (run in order)
                   05_strict_unique: one-off for shards created before it (01 has it built in)
@@ -36,7 +37,9 @@ sql/shard/runbook-reclaim-space.md
 scripts/upload_tarif.py       CSV upload; picks the shard per hospital (SHARD_n_SERVICE_KEY)
 scripts/move-hospital.js      move hospitals between shards (needs DATABASE_URL_n)
 sql/golongan/     01_schema → 02_rpc → 03_security  (golongan operasi project)
+                  04_clinical_pathway: Clinical Pathway tables + RPCs (same project)
 scripts/upload_golongan.py    CSV upload of golongan operasi (GOLONGAN_SERVICE_KEY)
+scripts/upload_clinical_pathway.py  Excel upload of Clinical Pathway packages (GOLONGAN_SERVICE_KEY)
 scripts/build_kategori_besar.py  Excel (sheet Mapping) → _kategori_besar.json
 workers/keepalive/            cron Worker: daily shard_stats() ping per shard
 docs/shard-guide.md           how-to for humans: new shard, uploading, moving, limits
@@ -136,6 +139,23 @@ Env in Cloudflare Pages (Production and Preview): `GOLONGAN_URL`,
 500 with the variable names. The keep-alive Worker pings it when
 `GOLONGAN_URL` is set.
 
+## Clinical Pathway tab
+
+Package prices (e.g. Mitra Keluarga clinical pathways) in the golongan
+project, `sql/golongan/04_clinical_pathway.sql`: `cp_paket` = one card
+(hospital × diagnosis × medical treatment × ICD 10, with LOS), `cp_harga` =
+total price per class (0 = not offered there, shown "Belum tersedia"),
+`cp_rincian` = the package items (kegiatan, item, keterangan, qty) in source
+order, the same for every class. RPCs: `cp_filters()` (lists + relations for
+narrowing), `cp_search(f_rumah_sakit, f_diagnosis, f_treatment)` (cards without
+items), `cp_rincian(f_paket_id)` (loaded when a card opens). `cp_upload(payload)`
+is service_role only: it replaces the hospitals in the payload in one
+transaction. `scripts/upload_clinical_pathway.py` reads the Excel exports
+(columns Diagnosis, Tindakan, LOS, KEGIATAN, Item, Keterangan, QTY, ICD 10,
+Medical Treatment, KELAS, CABANG, TARIF; TARIF is the package total repeated on
+each item row), names hospitals `--rs-prefix` + CABANG, tidies spaces/case,
+refuses data whose items differ between classes, and uploads per hospital.
+
 ## Commands
 
 ```bash
@@ -145,6 +165,7 @@ cd frontend && npx wrangler pages functions build --outdir /tmp/fn   # check Fun
 cd scripts && pip install -r requirements.txt && python upload_tarif.py data.csv --dry-run
 cd scripts && npm install && node move-hospital.js --from 1 --to 2 --rs "Nama RS" [--delete]
 cd scripts && python upload_golongan.py buku_golongan.csv --dry-run
+cd scripts && python upload_clinical_pathway.py g1.xlsx g2.xlsx g3.xlsx --dry-run
 cd workers/keepalive && npx wrangler secret put SHARD_1_KEY && npx wrangler deploy
 ```
 

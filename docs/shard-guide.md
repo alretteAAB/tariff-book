@@ -327,3 +327,25 @@ python upload_golongan.py buku_golongan_rs_baru.csv --dry-run
 python upload_golongan.py buku_golongan_rs_baru.csv
 ```
 New data shows on the site right away; no deploy needed.
+
+### 4.3 The Clinical Pathway tab
+Package prices per hospital, diagnosis and medical treatment (the Mitra Keluarga
+clinical pathway files). They live in the golongan project too, so no new keys.
+
+Once: in the golongan project's SQL Editor, run `sql/golongan/04_clinical_pathway.sql`.
+
+Upload (or update) the Excel files:
+```bash
+cd scripts
+python upload_clinical_pathway.py g1v2.xlsx g2v2.xlsx g3v2.xlsx --dry-run
+python upload_clinical_pathway.py g1v2.xlsx g2v2.xlsx g3v2.xlsx
+```
+- Hospital name = "Mitra Keluarga " + CABANG; for another hospital group use
+  `--rs-prefix "Nama Grup"`.
+- Each hospital in the files is **replaced** as a whole (old cards of that
+  hospital are removed first), so uploading the same files again changes nothing.
+- The script stops before writing if the items of a package differ between
+  classes, or a package has two different prices for one class.
+- A price of 0 shows as "Belum tersedia" on the site.
+New data shows on the site within 5 minutes (browser cache); no deploy needed.
+

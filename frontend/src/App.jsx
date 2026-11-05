@@ -4,6 +4,7 @@ import { scrollToTop, scrollToBottom } from "./lib/utils.jsx";
 import GolonganView from "./views/GolonganView.jsx";
 import TarifView from "./views/TarifView.jsx";
 import KenaikanView from "./views/KenaikanView.jsx";
+import ClinicalPathwayView from "./views/ClinicalPathwayView.jsx";
 // by Aldo Oktavianus
 // data by Arfan Hafidt Nashrullah
 // idea Beatrice Marietta 
@@ -15,7 +16,7 @@ const PANDUAN_URL = "https://drive.google.com/file/d/1B1Hc7ZFzZHywgborYsZcVJKCsi
 // menyerahkan isi halaman ke view yang aktif. Tiap view memegang state-nya
 // sendiri — berpindah tab akan mengosongkannya, dan itu memang disengaja.
 export default function App() {
-  const [tab, setTab] = useState("tarif"); // halaman aktif: 'tarif' | 'golongan' | 'kenaikan'
+  const [tab, setTab] = useState("tarif"); // halaman aktif: 'tarif' | 'golongan' | 'kenaikan' | 'pathway'
 
   return (
     <>
@@ -46,6 +47,12 @@ export default function App() {
             >
               Dashboard
             </button>
+            <button
+              className={`nav-tab ${tab === 'pathway' ? 'active' : ''}`}
+              onClick={() => setTab('pathway')}
+            >
+              Clinical Pathway
+            </button>
           </nav>
           <a
             href={PANDUAN_URL}
@@ -69,7 +76,10 @@ export default function App() {
           </a>
         </header>
 
-        {tab === 'golongan' ? <GolonganView /> : tab === 'kenaikan' ? <KenaikanView /> : <TarifView />}
+        {tab === 'golongan' ? <GolonganView />
+          : tab === 'kenaikan' ? <KenaikanView />
+          : tab === 'pathway' ? <ClinicalPathwayView />
+          : <TarifView />}
 
         <div className="scroll-btns">
           <button className="scroll-btn" onClick={scrollToTop} title="Ke Atas">↑</button>
