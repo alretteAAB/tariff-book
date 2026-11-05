@@ -149,3 +149,7 @@ frontend/node_modules/
 
 # python
 __pycache__/
+
+# data files used by the upload scripts (keep them out of git)
+scripts/*.xlsx
+scripts/*.csv

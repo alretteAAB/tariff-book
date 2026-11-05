@@ -1,20 +1,25 @@
 """Upload paket Clinical Pathway (Excel) ke project Supabase golongan.
 
     cd scripts
-    python upload_clinical_pathway.py g1v2.xlsx g2v2.xlsx g3v2.xlsx --dry-run
-    python upload_clinical_pathway.py g1v2.xlsx g2v2.xlsx g3v2.xlsx
+    python upload_clinical_pathway.py tarif_gabungan.xlsx --dry-run
+    python upload_clinical_pathway.py tarif_gabungan.xlsx
 
-Kolom Excel (sheet pertama): Diagnosis, Tindakan, LOS, KEGIATAN, Item,
-Keterangan, QTY, ICD 10, Medical Treatment, KELAS, CABANG, TARIF. Kolom lain
-(Sumber Sheet, LOS Dirty) diabaikan. Satu baris = satu rincian paket; TARIF
-adalah harga total paket untuk (cabang, kelas), diulang di tiap baris.
+Dua format Excel dibaca (sheet pertama; kolom lain diabaikan). Satu baris =
+satu rincian paket; TARIF adalah harga total paket untuk (RS, kelas), diulang
+di tiap baris.
+- Format gabungan (mis. "Sampling Tarif Gabungan ... Garda"): Treatment Place
+  (nama RS lengkap), DIAGNOSIS, Medical Treatment (boleh kosong, untuk paket
+  medis tanpa tindakan khusus), Diagnose Id (ICD 10), LOS, KEGIATAN, Item,
+  Keterangan, QTY, KELAS, TARIF.
+- Format per group (g1v2/g2v2/g3v2): CABANG, Diagnosis, Medical Treatment,
+  ICD 10, Tindakan, LOS, KEGIATAN, Item, Keterangan, QTY, KELAS, TARIF. Nama RS
+  = --rs-prefix + CABANG ("Mitra Keluarga" + "Bekasi Timur").
 
 Yang dilakukan:
-- Nama rumah sakit = --rs-prefix + CABANG ("Mitra Keluarga" + "Bekasi Timur").
 - Teks dirapikan: spasi di depan/belakang dan spasi ganda dihapus; label yang
   sama kecuali huruf besar/kecil memakai ejaan yang paling sering dipakai di
   semua file sekaligus. LOS jadi angka.
-- Satu card = rumah sakit x Diagnosis x Medical Treatment x ICD 10, dengan
+- Satu card = rumah sakit x diagnosis x medical treatment x ICD 10, dengan
   harga per kelas dan daftar rinciannya. Rincian harus sama di semua kelas
   (yang beda hanya harganya); kalau tidak, script berhenti sebelum menulis.
 - Upload per rumah sakit lewat cp_upload(): data lama RS itu diganti dalam
@@ -36,12 +41,17 @@ import pandas as pd
 
 from upload_tarif import Progress, fmt_int, load_env
 
-REQUIRED = ["Diagnosis", "Tindakan", "LOS", "KEGIATAN", "Item", "Keterangan", "QTY",
-            "ICD 10", "Medical Treatment", "KELAS", "CABANG", "TARIF"]
-ALIASES = {"DIAGNOSA": "Medical Treatment"}   # older exports
-TEXT = ["Diagnosis", "Tindakan", "KEGIATAN", "Item", "Keterangan", "ICD 10",
-        "Medical Treatment", "KELAS", "CABANG"]
-CARD = ["CABANG", "Diagnosis", "Medical Treatment", "ICD 10"]
+# Both source formats are mapped onto these columns.
+FORMATS = {
+    "gabungan": {"RS": "Treatment Place", "DIAG": "DIAGNOSIS", "MT": "Medical Treatment",
+                 "ICD": "Diagnose Id", "TINDAKAN": None},
+    "per group": {"RS": "CABANG", "DIAG": "Diagnosis", "MT": "Medical Treatment",
+                  "ICD": "ICD 10", "TINDAKAN": "Tindakan"},
+}
+COMMON = ["LOS", "KEGIATAN", "Item", "Keterangan", "QTY", "KELAS", "TARIF"]
+ALIASES = {"DIAGNOSA": "Medical Treatment"}   # older per-group exports
+TEXT = ["RS", "DIAG", "MT", "ICD", "TINDAKAN", "KEGIATAN", "Item", "Keterangan", "KELAS"]
+CARD = ["RS", "DIAG", "MT", "ICD"]
 KELAS_ORDER = {"KELAS 1": 1, "KELAS 2": 2, "KELAS 3": 3, "ODS": 4}
 
 
@@ -53,18 +63,30 @@ def none_if_nan(v):
     return None if v is None or (isinstance(v, float) and pd.isna(v)) else v
 
 
-def read_files(paths: list) -> pd.DataFrame:
+def read_files(paths: list, prefix: str) -> pd.DataFrame:
     frames = []
     for path in paths:
         df = pd.read_excel(path, dtype=object).rename(columns=ALIASES)
-        missing = [c for c in REQUIRED if c not in df.columns]
+        fmt = "gabungan" if "Treatment Place" in df.columns else "per group"
+        cols = FORMATS[fmt]
+        missing = [c for c in [v for v in cols.values() if v] + COMMON if c not in df.columns]
         if missing:
-            sys.exit(f"{path}: kolom tidak ada: {', '.join(missing)}")
-        df = df[REQUIRED].copy()
-        df["_file"] = Path(path).name
-        df["_row"] = range(2, len(df) + 2)   # Excel row number, for messages
-        frames.append(df)
+            sys.exit(f"{path}: kolom tidak ada ({fmt}): {', '.join(missing)}")
+        out = pd.DataFrame({k: (df[v] if v else None) for k, v in cols.items()})
+        for c in COMMON:
+            out[c] = df[c]
+        if fmt == "per group":
+            out["RS"] = out["RS"].map(lambda c: f"{prefix} {c}".strip() if isinstance(c, str) else c)
+        out["_file"] = Path(path).name
+        out["_row"] = range(2, len(out) + 2)   # Excel row number, for messages
+        print(f"{Path(path).name}: format {fmt}, {fmt_int(len(out))} baris")
+        frames.append(out)
     df = pd.concat(frames, ignore_index=True)
+
+    empty = df[df["RS"].isna() | df["DIAG"].isna()]
+    if len(empty):
+        r = empty.iloc[0]
+        sys.exit(f"Nama RS / diagnosis kosong di {r['_file']} baris {r['_row']}")
 
     # one spelling per label (ignoring spaces and case), the most used one
     for c in TEXT:
@@ -85,11 +107,11 @@ def read_files(paths: list) -> pd.DataFrame:
     return df
 
 
-def build_cards(df: pd.DataFrame, prefix: str) -> list:
+def build_cards(df: pd.DataFrame) -> list:
     cards, problems = [], []
     for key, g in df.groupby(CARD, sort=True, dropna=False):
-        cabang, diagnosis, treatment, icd = key
-        where = f"{cabang} / {diagnosis} / {treatment}"
+        rs, diagnosis, treatment, icd = (none_if_nan(v) for v in key)
+        where = " / ".join(v for v in (rs, diagnosis, treatment) if v)
         harga = []
         rincian_per_kelas = {}
         for kelas, k in g.groupby("KELAS", sort=False):
@@ -115,11 +137,11 @@ def build_cards(df: pd.DataFrame, prefix: str) -> list:
         harga.sort(key=lambda h: (KELAS_ORDER.get(h["kelas"].upper(), 9), h["kelas"]))
         rincian = [{"kegiatan": a, "item": b, "keterangan": c, "qty": d} for a, b, c, d in next(iter(lists), ())]
         cards.append({
-            "rumah_sakit": f"{prefix} {cabang}".strip(),
+            "rumah_sakit": rs,
             "diagnosis": diagnosis,
             "medical_treatment": treatment,
-            "icd10": none_if_nan(icd),
-            "tindakan": g["Tindakan"].iloc[0],
+            "icd10": icd,
+            "tindakan": none_if_nan(g["TINDAKAN"].iloc[0]),
             "los": int(los[0]),
             "harga": harga,
             "rincian": rincian,
@@ -133,12 +155,12 @@ def build_cards(df: pd.DataFrame, prefix: str) -> list:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Upload paket Clinical Pathway ke project golongan")
     ap.add_argument("xlsx", nargs="+")
-    ap.add_argument("--rs-prefix", default="Mitra Keluarga", help='awalan nama RS (default "Mitra Keluarga")')
+    ap.add_argument("--rs-prefix", default="Mitra Keluarga", help='format per group: awalan nama RS sebelum CABANG (default "Mitra Keluarga")')
     ap.add_argument("--dry-run", action="store_true", help="tampilkan rencana saja, tanpa menulis")
     args = ap.parse_args()
 
-    df = read_files(args.xlsx)
-    cards = build_cards(df, args.rs_prefix)
+    df = read_files(args.xlsx, args.rs_prefix)
+    cards = build_cards(df)
     per_rs = {}
     for c in cards:
         per_rs.setdefault(c["rumah_sakit"], []).append(c)

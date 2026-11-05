@@ -143,18 +143,22 @@ Env in Cloudflare Pages (Production and Preview): `GOLONGAN_URL`,
 
 Package prices (e.g. Mitra Keluarga clinical pathways) in the golongan
 project, `sql/golongan/04_clinical_pathway.sql`: `cp_paket` = one card
-(hospital × diagnosis × medical treatment × ICD 10, with LOS), `cp_harga` =
-total price per class (0 = not offered there, shown "Belum tersedia"),
-`cp_rincian` = the package items (kegiatan, item, keterangan, qty) in source
-order, the same for every class. RPCs: `cp_filters()` (lists + relations for
-narrowing), `cp_search(f_rumah_sakit, f_diagnosis, f_treatment)` (cards without
-items), `cp_rincian(f_paket_id)` (loaded when a card opens). `cp_upload(payload)`
-is service_role only: it replaces the hospitals in the payload in one
-transaction. `scripts/upload_clinical_pathway.py` reads the Excel exports
-(columns Diagnosis, Tindakan, LOS, KEGIATAN, Item, Keterangan, QTY, ICD 10,
-Medical Treatment, KELAS, CABANG, TARIF; TARIF is the package total repeated on
-each item row), names hospitals `--rs-prefix` + CABANG, tidies spaces/case,
-refuses data whose items differ between classes, and uploads per hospital.
+(hospital × diagnosis × medical treatment × ICD 10, with LOS; medical treatment
+may be empty for medical packages, then the card title is the diagnosis),
+`cp_harga` = total price per class (0 = not offered there, shown "Belum
+tersedia"), `cp_rincian` = the package items (kegiatan, item, keterangan, qty)
+in source order, the same for every class. RPCs: `cp_filters()` (lists +
+relations for narrowing; empty treatments are not listed), `cp_search(f_rumah_sakit,
+f_diagnosis, f_treatment)` (cards without items), `cp_rincian(f_paket_id)`
+(loaded when a card opens). `cp_upload(payload)` is service_role only: it
+replaces the hospitals in the payload in one transaction.
+`scripts/upload_clinical_pathway.py` reads two Excel layouts (TARIF is the
+package total repeated on each item row): the combined file (Treatment Place =
+full hospital name, DIAGNOSIS, Medical Treatment, Diagnose Id, LOS, KEGIATAN,
+Item, Keterangan, QTY, KELAS, TARIF) and the older per-group files (CABANG +
+`--rs-prefix`, Diagnosis, Medical Treatment, ICD 10, Tindakan, ...). It tidies
+spaces/case, refuses data whose items differ between classes, and uploads per
+hospital.
 
 ## Commands
 
@@ -165,7 +169,7 @@ cd frontend && npx wrangler pages functions build --outdir /tmp/fn   # check Fun
 cd scripts && pip install -r requirements.txt && python upload_tarif.py data.csv --dry-run
 cd scripts && npm install && node move-hospital.js --from 1 --to 2 --rs "Nama RS" [--delete]
 cd scripts && python upload_golongan.py buku_golongan.csv --dry-run
-cd scripts && python upload_clinical_pathway.py g1.xlsx g2.xlsx g3.xlsx --dry-run
+cd scripts && python upload_clinical_pathway.py tarif_gabungan.xlsx --dry-run
 cd workers/keepalive && npx wrangler secret put SHARD_1_KEY && npx wrangler deploy
 ```
 
