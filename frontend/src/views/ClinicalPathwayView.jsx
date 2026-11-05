@@ -191,10 +191,10 @@ function Prices({ harga, className }) {
 }
 
 function PathwayCard({ card, selected, onOpen }) {
-  // satu baris kolom: Medical Treatment | Diagnosis | ICD 10 | LOS
+  // satu baris kolom: Diagnosis | Medical Treatment | ICD 10 | LOS
   const fields = [
-    ['Medical Treatment', card.medical_treatment || '—', 'cp-field-mt'],
     ['Diagnosis', card.diagnosis, 'cp-field-diag'],
+    ['Medical Treatment', card.medical_treatment || '—', 'cp-field-mt'],
     ['ICD 10', card.icd10 || '—', 'cp-field-icd'],
     ['LOS', card.los != null ? `${card.los} hari` : '—', 'cp-field-los'],
   ];
@@ -225,8 +225,8 @@ function DetailPanel({ card, rincian, onRetry, onClose }) {
     headingRef.current?.scrollIntoView({ block: 'nearest' });
   }, []);
   const facts = [
-    ['Medical Treatment', card.medical_treatment || '—'],
     ['Diagnosis', card.diagnosis],
+    ['Medical Treatment', card.medical_treatment || '—'],
     ['ICD 10', card.icd10 || '—'],
     ['LOS', card.los != null ? `${card.los} hari` : '—'],
   ];
