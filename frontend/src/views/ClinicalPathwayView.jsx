@@ -232,18 +232,28 @@ function DetailPanel({ card, rincian, onRetry, onClose }) {
   ];
   return (
     <section id="cp-detail" className="cp-detail" aria-labelledby="cp-detail-title">
-      <div className="cp-detail-bar">
-        <button className="cp-back" onClick={onClose}>← Kembali ke daftar</button>
-        <h2 id="cp-detail-title" className="cp-detail-rs" ref={headingRef} tabIndex={-1}>{card.rumah_sakit}</h2>
-        <button className="cp-close" onClick={onClose} aria-label="Tutup detail">×</button>
+      {/* bagian atas tetap terlihat saat rincian di-scroll, supaya jelas paket mana yang dibaca */}
+      <div className="cp-detail-head">
+        <div className="cp-detail-bar">
+          <button className="cp-back" onClick={onClose}>← Kembali ke daftar</button>
+          <h2 id="cp-detail-title" className="cp-detail-rs" ref={headingRef} tabIndex={-1}>{card.rumah_sakit}</h2>
+          <button className="cp-close" onClick={onClose} aria-label="Tutup detail">×</button>
+        </div>
+        <dl className="cp-facts">
+          {facts.map(([label, value]) => (
+            <div key={label} className="cp-fact"><dt>{label}</dt><dd>{value}</dd></div>
+          ))}
+        </dl>
+        <div className="cp-head-prices">
+          <h3 className="cp-detail-h3">Harga paket</h3>
+          <Prices harga={card.harga} className="cp-prices cp-prices-detail" />
+        </div>
       </div>
-      <dl className="cp-facts">
-        {facts.map(([label, value]) => (
-          <div key={label} className="cp-fact"><dt>{label}</dt><dd>{value}</dd></div>
-        ))}
-      </dl>
-      <h3 className="cp-detail-h3">Harga paket</h3>
-      <Prices harga={card.harga} className="cp-prices cp-prices-detail" />
+      {/* layar sempit: harga ikut di-scroll supaya bagian yang menempel tidak terlalu tinggi */}
+      <div className="cp-body-prices">
+        <h3 className="cp-detail-h3">Harga paket</h3>
+        <Prices harga={card.harga} className="cp-prices cp-prices-detail" />
+      </div>
       <h3 className="cp-detail-h3">
         Rincian{rincian?.data ? <span className="cp-count"> · {rincian.data.length} item</span> : null}
       </h3>
