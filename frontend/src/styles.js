@@ -1012,7 +1012,14 @@ export const styles = `
   .cp-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .cp-rs { font-size: 12px; font-weight: 600; color: var(--gold); }
   .cp-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
-  .cp-meta { font-size: 12px; color: var(--text-muted); }
+  /* Diagnosis | ICD 10 | LOS berjejer seperti kolom tabel */
+  .cp-fields { display: flex; flex-wrap: wrap; margin-top: 6px; }
+  .cp-field { display: flex; flex-direction: column; gap: 1px; padding: 0 14px; border-left: 1px solid var(--border); }
+  .cp-field:first-child { padding-left: 0; border-left: none; }
+  .cp-field-diag { flex: 0 1 auto; min-width: 0; }
+  .cp-field-label { font-size: 11px; color: var(--text-muted); }
+  .cp-field-value { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+  .cp-field-diag .cp-field-value { white-space: normal; }
 
   /* Harga per kelas: di card (kanan, atau di bawah saat daftar menyempit) dan di panel */
   .cp-prices { display: flex; gap: 0; margin: 0; flex-shrink: 0; }
