@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { styles } from "./styles.js";
 import { scrollToTop, scrollToBottom } from "./lib/utils.jsx";
 import GolonganView from "./views/GolonganView.jsx";
@@ -17,12 +17,25 @@ const PANDUAN_URL = "https://drive.google.com/file/d/1B1Hc7ZFzZHywgborYsZcVJKCsi
 // sendiri — berpindah tab akan mengosongkannya, dan itu memang disengaja.
 export default function App() {
   const [tab, setTab] = useState("tarif"); // halaman aktif: 'tarif' | 'golongan' | 'kenaikan' | 'pathway'
+  const headerRef = useRef(null);
+
+  // Header menempel di atas; tinggi aslinya (berubah di HP karena tab turun ke
+  // baris berikut) jadi --header-h, supaya bagian lain yang menempel bisa
+  // berhenti tepat di bawahnya, bukan tertutup.
+  useEffect(() => {
+    const el = headerRef.current;
+    const set = () => document.documentElement.style.setProperty('--header-h', `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
     <>
       <style>{styles}</style>
       <div className="app">
-        <header className="header">
+        <header className="header" ref={headerRef}>
           <div className="header-icon">📒</div>
           <div>
             <div className="header-title">Buku Tarif</div>

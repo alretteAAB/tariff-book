@@ -1069,14 +1069,21 @@ export const styles = `
 
   /* Panel detail: tetap terlihat saat daftar di-scroll */
   .cp-detail {
-    position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto;
+    position: sticky; top: calc(var(--header-h, 0px) + 16px);
+    max-height: calc(100vh - var(--header-h, 0px) - 32px); overflow-y: auto;
     background: var(--card); border: 1px solid var(--border-mid); border-radius: var(--radius-sm);
     padding: 0 24px 24px; animation: cpSlide 0.16s ease-out;
   }
   @keyframes cpSlide { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { .cp-detail { animation: none; } }
+  .cp-detail-head {
+    position: sticky; top: 0; z-index: 2; margin: 0 -24px 20px; padding: 0 24px 16px;
+    background: var(--card); border-bottom: 1px solid var(--border-mid);
+  }
+  .cp-head-prices .cp-prices-detail { margin-bottom: 0; }
+  .cp-body-prices { display: none; }
   .cp-detail-bar {
-    position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; gap: 12px;
     margin: 0 -24px; padding: 12px 24px; background: var(--card); border-bottom: 1px solid var(--border);
   }
   .cp-detail-rs { flex: 1; margin: 0; font-size: 15px; font-weight: 700; color: var(--gold-dark); }
@@ -1127,7 +1134,13 @@ export const styles = `
     .cp-layout.has-detail { grid-template-columns: minmax(0, 1fr); }
     .cp-layout.has-detail .cp-list { display: none; }
     .cp-detail { position: static; max-height: none; overflow: visible; padding: 0 16px 20px; }
+    .cp-detail-head { top: var(--header-h, 0px); margin: 0 -16px 16px; padding: 0 16px; }
     .cp-detail-bar { margin: 0 -16px; padding: 10px 16px; }
+    .cp-head-prices { display: none; }
+    .cp-body-prices { display: block; }
+    .cp-facts { margin: 12px 0 0; border-bottom: none; }
+    .cp-fact { padding-top: 8px; padding-bottom: 8px; }
+    .cp-fact dt { margin-bottom: 2px; }
     .cp-back {
       display: inline-block; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
       background: var(--surface); color: var(--text-muted); font-family: var(--font-body); font-size: 12px; cursor: pointer;
@@ -1169,7 +1182,7 @@ export const styles = `
     .cp-card .cp-price:first-child > * { padding-left: 0; }
     .cp-card .cp-price dt, .cp-card .cp-price dd { padding-left: 8px; padding-right: 4px; }
     .cp-card .cp-price dd { font-size: 13px; }
-    .cp-fact dd { font-size: 16px; }
+    .cp-fact dd { font-size: 15px; }
     .cp-prices-detail { flex-direction: column; }
     .cp-prices-detail .cp-price {
       display: flex; justify-content: space-between; align-items: baseline;
