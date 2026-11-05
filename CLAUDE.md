@@ -149,8 +149,9 @@ may be empty for medical packages, then the card title is the diagnosis),
 tersedia"), `cp_rincian` = the package items (kegiatan, item, keterangan, qty)
 in source order, the same for every class. RPCs: `cp_filters()` (lists +
 relations for narrowing; empty treatments are not listed), `cp_search(f_rumah_sakit,
-f_diagnosis, f_treatment)` (cards without items), `cp_rincian(f_paket_id)`
-(loaded when a card opens). `cp_upload(payload)` is service_role only: it
+f_diagnosis, f_treatment)` (cards without items, sorted by ICD 10), `cp_rincian(f_paket_id)`
+(loaded when a card opens; a package with price 0 in every class shows a
+"belum tersedia" note instead of prices and items, the items stay stored). `cp_upload(payload)` is service_role only: it
 replaces the hospitals in the payload in one transaction.
 `scripts/upload_clinical_pathway.py` reads two Excel layouts (TARIF is the
 package total repeated on each item row): the combined file (Treatment Place =

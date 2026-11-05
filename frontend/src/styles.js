@@ -1017,7 +1017,7 @@ export const styles = `
      Label dan nilai punya padding sendiri (kolom tanpa padding), jadi garis
      bawah label tersambung jadi satu garis sepanjang card. */
   .cp-fields {
-    display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 84px 72px;
+    display: grid; grid-template-columns: 84px minmax(0, 1.3fr) minmax(0, 1fr) 72px;
   }
   .cp-field { display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--border); }
   .cp-field:first-child { border-left: none; }
@@ -1030,14 +1030,14 @@ export const styles = `
   }
   .cp-field:first-child > * { padding-left: 0; }
   .cp-field-value { overflow-wrap: anywhere; }
-  .cp-field-mt .cp-field-value { font-weight: 600; }
-  /* kolom pendek di tengah, teks panjang rata kiri supaya mudah dibaca */
-  .cp-field-icd, .cp-field-los { text-align: center; }
+  /* hierarki: kode ICD (kunci urutan) paling tegas, nama-nama medium, harga emas */
+  .cp-field-icd .cp-field-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .cp-field-los { text-align: center; }
   .cp-field-icd .cp-field-value, .cp-field-los .cp-field-value { white-space: nowrap; }
-  /* daftar sempit (panel terbuka) dan HP: 2 x 2 */
-  .cp-layout.has-detail .cp-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 10px; }
-  .cp-layout.has-detail .cp-field:nth-child(3) { border-left: none; }
-  .cp-layout.has-detail .cp-field:nth-child(3) > * { padding-left: 0; }
+  /* daftar sempit (panel terbuka) dan HP: tetap satu baris, kolom lebih rapat */
+  .cp-layout.has-detail .cp-fields { grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr) 60px; }
+  .cp-layout.has-detail .cp-field > * { padding-left: 10px; padding-right: 10px; }
+  .cp-layout.has-detail .cp-field:first-child > * { padding-left: 0; }
   .cp-layout.has-detail .cp-field { text-align: left; }
 
   /* Harga per kelas: di card (kanan, atau di bawah saat daftar menyempit) dan di panel */
@@ -1050,6 +1050,14 @@ export const styles = `
   .cp-card .cp-price { padding: 0; text-align: center; }
   .cp-card .cp-price dd { color: var(--gold-dark); font-weight: 600; }
   .cp-price-none { font-size: 12px; font-weight: 400; font-style: italic; color: var(--text-dim); }
+  /* di panel: "Belum tersedia" sebesar teks harga supaya jelas */
+  .cp-prices-detail .cp-price-none { font-size: 16px; font-weight: 500; font-style: normal; color: var(--text-muted); }
+  /* paket tanpa harga di semua kelas: ganti harga + rincian dengan keterangan */
+  .cp-unavailable {
+    padding: 24px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
+  }
+  .cp-unavailable-title { margin: 0 0 6px; font-size: 20px; font-weight: 600; color: var(--text); }
+  .cp-unavailable-text { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text-muted); }
   .cp-card .cp-prices { border-left: 1px solid var(--border); }
   /* layar lebar: blok harga selebar 3 kelas supaya kolom sejajar antar card;
      ruang kosong (mis. hanya ODS) tetap diberi garis pemisah label */
@@ -1081,6 +1089,7 @@ export const styles = `
     background: var(--card); border-bottom: 1px solid var(--border-mid);
   }
   .cp-head-prices .cp-prices-detail { margin-bottom: 0; }
+  .cp-detail-head > .cp-facts:last-child { margin-bottom: 4px; border-bottom: none; }
   .cp-body-prices { display: none; }
   .cp-detail-bar {
     display: flex; align-items: center; gap: 12px;
@@ -1095,13 +1104,14 @@ export const styles = `
   }
   .cp-close:hover, .cp-back:hover { color: var(--text); border-color: var(--border-mid); }
   .cp-facts {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 20px 0 24px;
+    display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 0.7fr); margin: 20px 0 24px;
     border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
   }
   .cp-fact { padding: 12px 16px 12px 0; }
+  .cp-fact-icd dd { font-weight: 600; font-variant-numeric: tabular-nums; }
   .cp-fact + .cp-fact { padding-left: 16px; border-left: 1px solid var(--border); }
   .cp-fact dt { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
-  .cp-fact dd { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
+  .cp-fact dd { margin: 0; font-size: 18px; font-weight: 500; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
   .cp-detail-h3 { font-size: 14px; font-weight: 700; color: var(--text); margin: 0 0 10px; }
   .cp-count { font-weight: 400; color: var(--text-muted); }
   .cp-prices-detail { margin-bottom: 24px; }
@@ -1169,9 +1179,11 @@ export const styles = `
     .kn-panel { padding: 14px 12px 12px; }
     .kn-tick:not(.zero):not(:first-child):not(:last-child) { display: none; }
     .cp-card { grid-template-columns: minmax(0, 1fr); row-gap: 10px; padding: 12px 14px; }
-    .cp-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 8px; }
-    .cp-field:nth-child(3) { border-left: none; }
-    .cp-field:nth-child(3) > * { padding-left: 0; }
+    .cp-fields { grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr) 52px; }
+    .cp-field > * { padding-left: 8px; padding-right: 6px; }
+    .cp-field:first-child > * { padding-left: 0; }
+    .cp-field-value { font-size: 13px; }
+    .cp-field-label { overflow: hidden; text-overflow: ellipsis; }
     .cp-prices { border-top: 1px solid var(--border); padding-top: 8px; }
     .cp-price { flex: 1 1 0; min-width: 0; padding: 0 8px; text-align: left; }
     .cp-price:first-child { padding-left: 0; }

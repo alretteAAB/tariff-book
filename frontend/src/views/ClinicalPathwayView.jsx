@@ -16,6 +16,9 @@ const NONE = [];
 const fmtHarga = (v) => formatRupiah(Math.round(Number(v)));
 const kelasLabel = (k) => (/^kelas\s/i.test(k) ? `Kelas ${k.replace(/^kelas\s*/i, '')}` : k);
 const fmtQty = (q) => (q == null ? '–' : Number(q).toLocaleString('id-ID'));
+// Harga 0 = paket belum ditawarkan di kelas itu. Paket tanpa satu pun harga
+// tidak menampilkan rinciannya (datanya tetap disimpan di database).
+const isOffered = (card) => card.harga.some(h => Number(h.tarif) > 0);
 
 // Nilai `key` dari relasi yang cocok dengan semua pilihan lain (kosong = semua),
 // dalam urutan daftar `all`.
@@ -94,10 +97,10 @@ export default function ClinicalPathwayView() {
   // Card yang terbuka hilang dari daftar (filter berubah) -> panel ikut tertutup.
   const selected = list.find(c => c.id === selectedId) ?? null;
 
-  const open = (id) => {
-    setSelectedId(id);
-    const r = rincian.get(id);
-    if (!r || r.error) loadRincian(id);
+  const open = (card) => {
+    setSelectedId(card.id);
+    const r = rincian.get(card.id);
+    if (isOffered(card) && (!r || r.error)) loadRincian(card.id);
   };
   const close = useCallback(() => {
     const id = selectedId;
@@ -154,7 +157,7 @@ export default function ClinicalPathwayView() {
           <div className={`cp-layout ${selected ? 'has-detail' : ''}`}>
             <div className={`cp-list ${cards.loading ? 'kn-stale' : ''}`}>
               {list.map(c => (
-                <PathwayCard key={c.id} card={c} selected={c.id === selectedId} onOpen={() => open(c.id)} />
+                <PathwayCard key={c.id} card={c} selected={c.id === selectedId} onOpen={() => open(c)} />
               ))}
             </div>
             {selected && (
@@ -191,11 +194,12 @@ function Prices({ harga, className }) {
 }
 
 function PathwayCard({ card, selected, onOpen }) {
-  // satu baris kolom: Diagnosis | Medical Treatment | ICD 10 | LOS
+  // satu baris kolom: ICD 10 | Diagnosis | Medical Treatment | LOS
+  // (daftar diurutkan menurut ICD 10, jadi kodenya di kiri dan paling tegas)
   const fields = [
+    ['ICD 10', card.icd10 || '—', 'cp-field-icd'],
     ['Diagnosis', card.diagnosis, 'cp-field-diag'],
     ['Medical Treatment', card.medical_treatment || '—', 'cp-field-mt'],
-    ['ICD 10', card.icd10 || '—', 'cp-field-icd'],
     ['LOS', card.los != null ? `${card.los} hari` : '—', 'cp-field-los'],
   ];
   return (
@@ -225,11 +229,12 @@ function DetailPanel({ card, rincian, onRetry, onClose }) {
     headingRef.current?.scrollIntoView({ block: 'nearest' });
   }, []);
   const facts = [
+    ['ICD 10', card.icd10 || '—', 'cp-fact-icd'],
     ['Diagnosis', card.diagnosis],
     ['Medical Treatment', card.medical_treatment || '—'],
-    ['ICD 10', card.icd10 || '—'],
     ['LOS', card.los != null ? `${card.los} hari` : '—'],
   ];
+  const offered = isOffered(card);
   return (
     <section id="cp-detail" className="cp-detail" aria-labelledby="cp-detail-title">
       {/* bagian atas tetap terlihat saat rincian di-scroll, supaya jelas paket mana yang dibaca */}
@@ -240,24 +245,38 @@ function DetailPanel({ card, rincian, onRetry, onClose }) {
           <button className="cp-close" onClick={onClose} aria-label="Tutup detail">×</button>
         </div>
         <dl className="cp-facts">
-          {facts.map(([label, value]) => (
-            <div key={label} className="cp-fact"><dt>{label}</dt><dd>{value}</dd></div>
+          {facts.map(([label, value, cls]) => (
+            <div key={label} className={`cp-fact ${cls ?? ''}`}><dt>{label}</dt><dd>{value}</dd></div>
           ))}
         </dl>
-        <div className="cp-head-prices">
-          <h3 className="cp-detail-h3">Harga paket</h3>
-          <Prices harga={card.harga} className="cp-prices cp-prices-detail" />
+        {offered && (
+          <div className="cp-head-prices">
+            <h3 className="cp-detail-h3">Harga paket</h3>
+            <Prices harga={card.harga} className="cp-prices cp-prices-detail" />
+          </div>
+        )}
+      </div>
+      {offered ? (
+        <>
+          {/* layar sempit: harga ikut di-scroll supaya bagian yang menempel tidak terlalu tinggi */}
+          <div className="cp-body-prices">
+            <h3 className="cp-detail-h3">Harga paket</h3>
+            <Prices harga={card.harga} className="cp-prices cp-prices-detail" />
+          </div>
+          <h3 className="cp-detail-h3">
+            Rincian{rincian?.data ? <span className="cp-count"> · {rincian.data.length} item</span> : null}
+          </h3>
+          <Rincian state={rincian} onRetry={onRetry} />
+        </>
+      ) : (
+        <div className="cp-unavailable" role="status">
+          <p className="cp-unavailable-title">Belum tersedia</p>
+          <p className="cp-unavailable-text">
+            Rumah Sakit ini belum menyediakan layanan untuk diagnosis
+            {card.medical_treatment ? ' dan treatment' : ''} spesifik ini.
+          </p>
         </div>
-      </div>
-      {/* layar sempit: harga ikut di-scroll supaya bagian yang menempel tidak terlalu tinggi */}
-      <div className="cp-body-prices">
-        <h3 className="cp-detail-h3">Harga paket</h3>
-        <Prices harga={card.harga} className="cp-prices cp-prices-detail" />
-      </div>
-      <h3 className="cp-detail-h3">
-        Rincian{rincian?.data ? <span className="cp-count"> · {rincian.data.length} item</span> : null}
-      </h3>
-      <Rincian state={rincian} onRetry={onRetry} />
+      )}
     </section>
   );
 }

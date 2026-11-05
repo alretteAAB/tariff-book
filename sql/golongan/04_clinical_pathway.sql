@@ -71,8 +71,8 @@ returns jsonb language sql stable as $$
 $$;
 
 -- --- RPC: cards ---------------------------------------------------
--- Cards matching the filters (null = no filter), without their items. A
--- treatment filter only matches cards that have that treatment.
+-- Cards matching the filters (null = no filter), without their items, sorted
+-- by ICD 10. A treatment filter only matches cards that have that treatment.
 -- Cards:
 -- [{id, rumah_sakit, diagnosis, medical_treatment, icd10, tindakan, los,
 --   n_rincian, harga: [{kelas, tarif}]}]
@@ -90,7 +90,8 @@ returns jsonb language sql stable as $$
            'harga', (select coalesce(jsonb_agg(jsonb_build_object('kelas', h.kelas, 'tarif', h.tarif)
                                                order by cp_kelas_rank(h.kelas), h.kelas), '[]')
                      from cp_harga h where h.paket_id = p.id))
-         order by p.rumah_sakit, p.diagnosis, p.medical_treatment, p.icd10), '[]')
+         -- ICD 10 A-Z (kode yang sama dari RS berbeda jadi berdekatan), lalu nama
+         order by p.icd10 collate "C" nulls last, p.diagnosis, p.medical_treatment nulls first, p.rumah_sakit), '[]')
   from cp_paket p
   where (f_rumah_sakit is null or p.rumah_sakit       = any(f_rumah_sakit))
     and (f_diagnosis   is null or p.diagnosis         = any(f_diagnosis))
