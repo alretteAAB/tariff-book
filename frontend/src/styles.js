@@ -1058,21 +1058,22 @@ export const styles = `
   }
   .cp-unavailable-title { margin: 0 0 6px; font-size: 20px; font-weight: 600; color: var(--text); }
   .cp-unavailable-text { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text-muted); }
-  .cp-card .cp-prices { border-left: 1px solid var(--border); }
-  /* layar lebar: blok harga selebar 3 kelas supaya kolom sejajar antar card;
-     ruang kosong (mis. hanya ODS) tetap diberi garis pemisah label */
-  @media (min-width: 681px) {
-    .cp-layout:not(.has-detail) .cp-prices { min-width: 450px; }
-    .cp-layout:not(.has-detail) .cp-price { width: 150px; }
-    .cp-layout:not(.has-detail) .cp-prices::before {
-      content: ''; flex: 1; box-sizing: border-box; height: 23px; border-bottom: 1px solid var(--border);
-    }
+  /* Harga di card: grid. Layar lebar: satu kolom tetap per kelas di seluruh
+     daftar (--cp-slots), jadi kolom sejajar antar card. Layar sempit: hanya
+     kelas milik card itu, --cols kolom (4 kelas jadi 2 x 2). */
+  .cp-card .cp-prices {
+    display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+    border-left: 1px solid var(--border);
   }
-  /* daftar sempit dan HP: harga jadi baris tabel sendiri di bawah */
+  .cp-price-missing dd { color: var(--text-dim); font-weight: 400; }
+  @media (min-width: 681px) {
+    .cp-layout:not(.has-detail) .cp-card .cp-prices { grid-template-columns: repeat(var(--cp-slots, 3), 136px); }
+  }
   .cp-layout.has-detail .cp-card { grid-template-columns: minmax(0, 1fr); row-gap: 10px; padding: 12px 14px; }
-  .cp-layout.has-detail .cp-card .cp-prices { border-left: none; }
-  .cp-layout.has-detail .cp-card .cp-price { flex: 1 1 0; min-width: 0; text-align: left; }
-  .cp-layout.has-detail .cp-card .cp-price:first-child > * { padding-left: 0; }
+  .cp-layout.has-detail .cp-card .cp-prices { border-left: none; column-gap: 14px; row-gap: 10px; }
+  .cp-layout.has-detail .cp-price-missing { display: none; }
+  .cp-layout.has-detail .cp-card .cp-price { min-width: 0; border-left: none; text-align: left; }
+  .cp-layout.has-detail .cp-card .cp-price > * { padding-left: 0; padding-right: 0; }
   .cp-layout.has-detail .cp-card .cp-price dd { font-size: 13px; }
 
   /* Panel detail: tetap terlihat saat daftar di-scroll */
@@ -1188,11 +1189,11 @@ export const styles = `
     .cp-price { flex: 1 1 0; min-width: 0; padding: 0 8px; text-align: left; }
     .cp-price:first-child { padding-left: 0; }
     .cp-price dd { font-size: 13px; }
-    .cp-card .cp-prices { border-left: none; border-top: none; padding-top: 0; }
-    .cp-card .cp-price { padding: 0; text-align: left; }
+    .cp-card .cp-prices { border-left: none; border-top: none; padding-top: 0; column-gap: 12px; row-gap: 10px; }
+    .cp-price-missing { display: none; }
+    .cp-card .cp-price { padding: 0; border-left: none; text-align: left; }
     .cp-field { text-align: left; }
-    .cp-card .cp-price:first-child > * { padding-left: 0; }
-    .cp-card .cp-price dt, .cp-card .cp-price dd { padding-left: 8px; padding-right: 4px; }
+    .cp-card .cp-price dt, .cp-card .cp-price dd { padding-left: 0; padding-right: 0; }
     .cp-card .cp-price dd { font-size: 13px; }
     .cp-fact dd { font-size: 15px; }
     .cp-prices-detail { flex-direction: column; }
