@@ -14,6 +14,18 @@ import { MultiSelectDropdown } from "../components/MultiSelectDropdown.jsx";
 const NONE = [];
 // Harga di sumber datanya ada sennya (mis. 13.346.960,87); ditampilkan per rupiah.
 const fmtHarga = (v) => formatRupiah(Math.round(Number(v)));
+// Urutan kelas: VVIP/SVIP, VIP, Kelas 1, 2, 3, ODS, lalu kelas lain (A-Z).
+function kelasRank(k) {
+  const s = String(k).trim().toUpperCase();
+  if (/^(VVIP|SVIP|SUITE|PRESIDEN)/.test(s)) return 0;
+  if (/^VIP/.test(s)) return 1;
+  const m = s.match(/^(KELAS|KLS)\.?\s*(\d+|I{1,3})\b/);
+  if (m) return 1 + (/^\d/.test(m[2]) ? Number(m[2]) : m[2].length);
+  if (s === 'ODS') return 10;
+  return 20;
+}
+const byKelas = (a, b) => kelasRank(a) - kelasRank(b) || String(a).localeCompare(String(b));
+const sortHarga = (harga) => [...harga].sort((a, b) => byKelas(a.kelas, b.kelas));
 const kelasLabel = (k) => (/^kelas\s/i.test(k) ? `Kelas ${k.replace(/^kelas\s*/i, '')}` : k);
 const fmtQty = (q) => (q == null ? '–' : Number(q).toLocaleString('id-ID'));
 // Harga 0 = paket belum ditawarkan di kelas itu. Paket tanpa satu pun harga
@@ -94,6 +106,10 @@ export default function ClinicalPathwayView() {
   }, []);
 
   const list = cards.data ?? NONE;
+  // Semua kelas di daftar ini: di layar lebar tiap kelas punya kolom sendiri
+  // di semua card, jadi Kelas 1 selalu di bawah Kelas 1 walau ada RS dengan VIP.
+  const kelasCols = useMemo(
+    () => [...new Set(list.flatMap(c => c.harga.map(h => h.kelas)))].sort(byKelas), [list]);
   // Card yang terbuka hilang dari daftar (filter berubah) -> panel ikut tertutup.
   const selected = list.find(c => c.id === selectedId) ?? null;
 
@@ -154,10 +170,10 @@ export default function ClinicalPathwayView() {
             <div className="state-box"><div className="state-title">Tidak ada paket</div>
               <div className="state-sub">Tidak ada paket untuk kombinasi filter ini. Hapus salah satu filter untuk melihat paket lain.</div></div>
           )}
-          <div className={`cp-layout ${selected ? 'has-detail' : ''}`}>
+          <div className={`cp-layout ${selected ? 'has-detail' : ''}`} style={{ '--cp-slots': kelasCols.length || 1 }}>
             <div className={`cp-list ${cards.loading ? 'kn-stale' : ''}`}>
               {list.map(c => (
-                <PathwayCard key={c.id} card={c} selected={c.id === selectedId} onOpen={() => open(c)} />
+                <PathwayCard key={c.id} card={c} kelasCols={kelasCols} selected={c.id === selectedId} onOpen={() => open(c)} />
               ))}
             </div>
             {selected && (
@@ -183,7 +199,7 @@ function ErrorBox({ message }) {
 function Prices({ harga, className }) {
   return (
     <dl className={className}>
-      {harga.map(h => (
+      {sortHarga(harga).map(h => (
         <div key={h.kelas} className="cp-price">
           <dt>{kelasLabel(h.kelas)}</dt>
           <dd>{Number(h.tarif) > 0 ? fmtHarga(h.tarif) : <span className="cp-price-none">Belum tersedia</span>}</dd>
@@ -193,7 +209,36 @@ function Prices({ harga, className }) {
   );
 }
 
-function PathwayCard({ card, selected, onOpen }) {
+// Harga di card: satu sel per kelas di daftar (kelas yang tidak dimiliki RS
+// ini tampil "—" di layar lebar dan disembunyikan di layar sempit). --cols:
+// jumlah kolom di layar sempit (4 kelas jadi 2 x 2).
+function CardPrices({ harga, kelasCols }) {
+  const own = new Map(harga.map(h => [h.kelas, h]));
+  const n = own.size;
+  const cols = n <= 3 ? Math.max(n, 1) : n === 4 ? 2 : 3;
+  return (
+    <dl className="cp-prices" style={{ '--cols': cols }}>
+      {kelasCols.map(k => {
+        const h = own.get(k);
+        if (!h) {
+          return (
+            <div key={k} className="cp-price cp-price-missing" aria-hidden="true">
+              <dt>{kelasLabel(k)}</dt><dd>—</dd>
+            </div>
+          );
+        }
+        return (
+          <div key={k} className="cp-price">
+            <dt>{kelasLabel(k)}</dt>
+            <dd>{Number(h.tarif) > 0 ? fmtHarga(h.tarif) : <span className="cp-price-none">Belum tersedia</span>}</dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
+function PathwayCard({ card, kelasCols, selected, onOpen }) {
   // satu baris kolom: ICD 10 | Diagnosis | Medical Treatment | LOS
   // (daftar diurutkan menurut ICD 10, jadi kodenya di kiri dan paling tegas)
   const fields = [
@@ -217,7 +262,7 @@ function PathwayCard({ card, selected, onOpen }) {
         </span>
       </span>
       {/* harga paket yang sedang dibuka pindah ke panel detail */}
-      {!selected && <Prices harga={card.harga} className="cp-prices" />}
+      {!selected && <CardPrices harga={card.harga} kelasCols={kelasCols} />}
     </button>
   );
 }
