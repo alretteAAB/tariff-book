@@ -1,7 +1,7 @@
 import { json } from '../_supabase.js';
 import { golonganClient } from '../_golongan.js';
 
-// GET /api/golongan/filters -> { rumah_sakit: [], specialty: [], golongan: [] }
+// GET /api/golongan/filters -> { rumah_sakit: [], tahun: [], rs_tahun: [], specialty: [], golongan: [] }
 export async function onRequestGet({ env }) {
   try {
     const { data, error } = await golonganClient(env).rpc('get_golongan_filters');

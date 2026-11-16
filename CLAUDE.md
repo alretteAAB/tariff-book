@@ -38,7 +38,7 @@ scripts/upload_tarif.py       CSV/Excel upload; picks the shard per hospital (SH
 scripts/move-hospital.js      move hospitals between shards (needs DATABASE_URL_n)
 sql/golongan/     01_schema → 02_rpc → 03_security  (golongan operasi project)
                   04_clinical_pathway: Clinical Pathway tables + RPCs (same project)
-scripts/upload_golongan.py    CSV upload of golongan operasi (GOLONGAN_SERVICE_KEY)
+scripts/upload_golongan.py    CSV/Excel upload of golongan operasi (GOLONGAN_SERVICE_KEY)
 scripts/upload_clinical_pathway.py  Excel upload of Clinical Pathway packages (GOLONGAN_SERVICE_KEY)
 scripts/build_kategori_besar.py  Excel (sheet Mapping) → _kategori_besar.json
 workers/keepalive/            cron Worker: daily shard_stats() ping per shard
@@ -127,10 +127,16 @@ deploy.
 ## Golongan operasi project
 
 The "Golongan Operasi" tab reads a separate Supabase project (not a tarif
-shard, not in `SHARDS`): table `golongan_operasi(rumah_sakit, specialty,
-golongan, service_code, nama_layanan)`, RPCs `search_golongan(q,
-f_rumah_sakit, f_specialty, f_golongan, sort, page, page_size)`,
-`get_golongan_filters()`, `shard_stats()`. Search, filters, sort and paging
+shard, not in `SHARDS`): table `golongan_operasi(rumah_sakit, tahun, specialty,
+golongan, service_code, nama_layanan)` (`tahun` empty on rows uploaded before
+it existed; the unique key includes it), RPCs `search_golongan(q,
+f_rumah_sakit, f_tahun, f_specialty, f_golongan, sort, page, page_size)`,
+`get_golongan_filters()` (also `tahun` and `rs_tahun` for narrowing the year
+list), `shard_stats()` (per hospital also `rows_no_tahun`). Changing
+`search_golongan`'s arguments needs a `drop function` first (02 does it), then
+`03_security.sql` for the grant. `upload_golongan.py` reads CSV (`,` `;` or
+tab) or .xlsx; `--hapus-tanpa-tahun` deletes a hospital's old year-less rows
+before uploading it. Search, filters, sort and paging
 run in the database; golongan sorts by tier (`golongan_rank`: KECIL → SEDANG →
 BESAR → KHUSUS), text sorts with the ICU `id` collation `golongan_id` so the
 order matches the browser's old `localeCompare('id')`.

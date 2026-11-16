@@ -1,16 +1,18 @@
-import { parseList, json } from '../_supabase.js';
+import { parseList, parseMulti, json } from '../_supabase.js';
 import { golonganClient } from '../_golongan.js';
 
 const PAGE_SIZE = 50;
 
-// GET /api/golongan?q=&rumah_sakit=&specialty=&golongan=&sort=col:asc,...&page=
+// GET /api/golongan?q=&rumah_sakit=&tahun=&specialty=&golongan=&sort=col:asc,...&page=
 export async function onRequestGet({ request, env }) {
   const p = new URL(request.url).searchParams;
   const page = Math.max(1, parseInt(p.get('page')) || 1);
+  const years = (parseMulti(p, 'tahun') ?? []).map(Number).filter(Number.isInteger);
   try {
     const { data, error } = await golonganClient(env).rpc('search_golongan', {
       q: (p.get('q') || '').trim() || null,
       f_rumah_sakit: parseList(p, 'rumah_sakit'),
+      f_tahun:       years.length ? years : null,
       f_specialty:   parseList(p, 'specialty'),
       f_golongan:    parseList(p, 'golongan'),
       sort: p.get('sort') || null,

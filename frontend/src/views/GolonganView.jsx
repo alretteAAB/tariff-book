@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { API, highlight } from "../lib/utils.jsx";
 import { InfoTip } from "../components/InfoTip.jsx";
 import { MultiSelectDropdown } from "../components/MultiSelectDropdown.jsx";
@@ -7,20 +7,22 @@ import { SortPanel } from "../components/SortPanel.jsx";
 import { SortableTh } from "../components/SortableTh.jsx";
 
 // ─── GolonganView ───────────────────────────────────────────────────
-// Tab kedua: referensi golongan tindakan operasi (rumah sakit · spesialisasi ·
-// golongan · nama layanan). Datanya ada di project Supabase tersendiri
+// Tab kedua: referensi golongan tindakan operasi (rumah sakit · tahun ·
+// spesialisasi · golongan · nama layanan). Datanya ada di project Supabase tersendiri
 // (sql/golongan/*), diambil lewat /api/golongan; pencarian, filter, urutan,
 // dan paginasi dikerjakan database. Isi dropdown dari /api/golongan/filters
 // (golongan sudah urut menurut tingkat: Kecil → Sedang → Besar → Khusus).
 
 const GOL_SORT_FIELDS = [
   { col: 'rumah_sakit', label: 'Rumah Sakit' },
+  { col: 'tahun', label: 'Tahun', numeric: true },
   { col: 'specialty', label: 'Spesialisasi' },
   { col: 'golongan', label: 'Golongan' },
   { col: 'nama_layanan', label: 'Nama Layanan' },
 ];
 const GOL_DEFAULT_SORT = [
   { col: 'rumah_sakit', dir: 'asc' },
+  { col: 'tahun', dir: 'desc' },
   { col: 'specialty', dir: 'asc' },
   { col: 'golongan', dir: 'asc' },
 ];
@@ -31,12 +33,13 @@ export default function GolonganView() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selRS, setSelRS] = useState([]);
+  const [selTahun, setSelTahun] = useState([]);
   const [selSpec, setSelSpec] = useState([]);
   const [selGol, setSelGol] = useState([]);
   const [sortKeys, setSortKeys] = useState(GOL_DEFAULT_SORT);
   const [page, setPage] = useState(1);
 
-  const [filters, setFilters] = useState({ rumah_sakit: [], specialty: [], golongan: [] });
+  const [filters, setFilters] = useState({ rumah_sakit: [], tahun: [], rs_tahun: [], specialty: [], golongan: [] });
   const [filtersLoading, setFiltersLoading] = useState(true);
   const [filtersError, setFiltersError] = useState(false);
 
@@ -47,6 +50,7 @@ export default function GolonganView() {
   // Setiap perubahan kriteria mengembalikan ke halaman 1.
   const withPageReset = (setter) => (value) => { setter(value); setPage(1); };
   const changeRS = withPageReset(setSelRS);
+  const changeTahun = withPageReset(setSelTahun);
   const changeSpec = withPageReset(setSelSpec);
   const changeGol = withPageReset(setSelGol);
   const changeSort = withPageReset(setSortKeys);
@@ -57,7 +61,7 @@ export default function GolonganView() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then(setFilters)
+      .then(f => setFilters({ tahun: [], rs_tahun: [], ...f }))
       .catch(err => { console.error(err); setFiltersError(true); })
       .finally(() => setFiltersLoading(false));
   }, []);
@@ -82,9 +86,20 @@ export default function GolonganView() {
     return () => clearTimeout(t);
   }, [query]);
 
+  // Tahun yang ditawarkan: tahun milik RS yang dipilih (semua tahun kalau belum
+  // memilih RS). Pilihan tahun yang tidak dimiliki RS terpilih tidak dikirim.
+  const tahunOptions = useMemo(() => {
+    if (!selRS.length) return filters.tahun;
+    const rs = new Set(selRS);
+    const keep = new Set(filters.rs_tahun.filter(r => rs.has(r.rumah_sakit)).map(r => r.tahun));
+    return filters.tahun.filter(t => keep.has(t));
+  }, [filters, selRS]);
+  const tahun = useMemo(() => selTahun.filter(t => tahunOptions.includes(t)), [selTahun, tahunOptions]);
+
   const params = new URLSearchParams();
   if (debouncedQuery) params.set('q', debouncedQuery);
   selRS.forEach(v => params.append('rumah_sakit', v));
+  tahun.forEach(v => params.append('tahun', v));
   selSpec.forEach(v => params.append('specialty', v));
   selGol.forEach(v => params.append('golongan', v));
   params.set('sort', sortKeys.map(k => `${k.col}:${k.dir}`).join(','));
@@ -130,12 +145,13 @@ export default function GolonganView() {
   };
 
   const handleClear = () => {
-    setQuery(""); setSelRS([]); setSelSpec([]); setSelGol([]); setPage(1);
+    setQuery(""); setSelRS([]); setSelTahun([]); setSelSpec([]); setSelGol([]); setPage(1);
     setSortKeys(GOL_DEFAULT_SORT);
   };
 
   const activeGroups = [
     { type: 'rs', label: 'Rumah Sakit', values: selRS, set: changeRS },
+    { type: 'tahun', label: 'Tahun', values: tahun, set: changeTahun },
     { type: 'spec', label: 'Spesialisasi', values: selSpec, set: changeSpec },
     { type: 'gol', label: 'Golongan', values: selGol, set: changeGol },
   ].filter(g => g.values.length > 0);
@@ -151,6 +167,12 @@ export default function GolonganView() {
             options={filters.rumah_sakit}
             selected={selRS}
             onChange={changeRS}
+          />
+          <MultiSelectDropdown
+            label="Tahun"
+            options={tahunOptions}
+            selected={tahun}
+            onChange={changeTahun}
           />
           <MultiSelectDropdown
             label="Spesialisasi"
@@ -267,6 +289,7 @@ export default function GolonganView() {
           <thead>
             <tr>
               <SortableTh col="rumah_sakit" label="Rumah Sakit" sortKeys={sortKeys} onSort={handleSort} />
+              <SortableTh col="tahun" label="Tahun" sortKeys={sortKeys} onSort={handleSort} />
               <SortableTh col="specialty" label="Spesialisasi" sortKeys={sortKeys} onSort={handleSort} />
               <SortableTh col="golongan" label="Golongan" sortKeys={sortKeys} onSort={handleSort}>
                 <InfoTip label="Informasi kolom golongan">
@@ -280,12 +303,12 @@ export default function GolonganView() {
           <tbody>
             {loading && (
               <tr className="loading-row">
-                <td colSpan={4}><div className="spinner" /></td>
+                <td colSpan={5}><div className="spinner" /></td>
               </tr>
             )}
             {!loading && !error && pageRows.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ padding: '52px', textAlign: 'center' }}>
+                <td colSpan={5} style={{ padding: '52px', textAlign: 'center' }}>
                   <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.5 }}>🔍</div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 500, color: 'var(--text)', marginBottom: 6 }}>
                     Tidak ada hasil
@@ -297,8 +320,9 @@ export default function GolonganView() {
               </tr>
             )}
             {!loading && pageRows.map((r, i) => (
-              <tr key={`${r.rumah_sakit}-${r.specialty}-${r.golongan}-${r.service_code}-${r.nama_layanan}-${i}`}>
+              <tr key={`${r.rumah_sakit}-${r.tahun}-${r.specialty}-${r.golongan}-${r.service_code}-${r.nama_layanan}-${i}`}>
                 <td><span className="td-rs">{r.rumah_sakit}</span></td>
+                <td><span className="td-tahun">{r.tahun ?? '—'}</span></td>
                 <td><span className="td-spec">{highlight(r.specialty, debouncedQuery)}</span></td>
                 <td><span className="td-golongan">{r.golongan}</span></td>
                 <td><span className="td-layanan">{highlight(r.nama_layanan, debouncedQuery)}</span></td>

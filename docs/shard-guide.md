@@ -312,21 +312,30 @@ it is not in `SHARDS`, and the hospital rules above do not apply to it.
    Production**: `GOLONGAN_URL` = the project URL, `GOLONGAN_KEY` = its
    publishable (or legacy anon) key. Then **Retry deployment**.
 6. Check `https://…pages.dev/api/golongan/filters` (lists of hospitals,
-   specialties, golongan) and open the Golongan Operasi tab.
+   years, specialties, golongan) and open the Golongan Operasi tab.
 7. Keep-alive: add `"GOLONGAN_URL"` to `workers/keepalive/wrangler.jsonc`
    vars, `npx wrangler secret put GOLONGAN_KEY`, `npx wrangler deploy`.
 
 ### 4.2 Add a hospital's golongan book
-CSV columns: `rumah_sakit, specialty, golongan, nama_layanan` and optionally
-`service_code`. A leading `OPERASI ` in golongan is removed automatically.
-Golongan values outside KECIL / SEDANG(1-3) / BESAR 1-3 / KHUSUS 1-3 are
-listed in the dry run (they sort last). Uploading the same file again adds
-nothing (the database rejects identical rows).
+Columns: `rumah_sakit, tahun, specialty, golongan, service_code, nama_layanan`
+(`service_code` may be empty). The file may be .xlsx (first sheet) or CSV
+separated by `,`, `;` or tab. `tahun` is the 4-digit year of the book.
+A leading `OPERASI ` in golongan is removed automatically. Golongan values
+outside KECIL / SEDANG(1-3) / BESAR 1-3 / KHUSUS 1-3 are listed in the dry
+run (they sort last). Uploading the same file again adds nothing (the
+database rejects identical rows); the same line in another year is a new row.
 ```bash
-python upload_golongan.py buku_golongan_rs_baru.csv --dry-run
-python upload_golongan.py buku_golongan_rs_baru.csv
+python upload_golongan.py buku_golongan_rs_baru.xlsx --dry-run
+python upload_golongan.py buku_golongan_rs_baru.xlsx
 ```
 New data shows on the site right away; no deploy needed.
+
+**Year column, once (projects set up before it existed):** run
+`01_schema.sql`, `02_rpc.sql`, `03_security.sql` again in the golongan
+project. Existing rows stay, with an empty year ("—" on the site). To replace a
+hospital's old year-less rows with a new book that has years, add
+`--hapus-tanpa-tahun`: it deletes only the year-less rows of the hospitals in
+the file, right before uploading them.
 
 ### 4.3 The Clinical Pathway tab
 Package prices per hospital, diagnosis and medical treatment (the Mitra Keluarga
