@@ -40,6 +40,7 @@ export default function App() {
           <div>
             <div className="header-title">Buku Tarif</div>
             <div className="header-sub">Pencarian tarif layanan & tindakan medis rumah sakit</div>
+            <div className="header-sub">Got Issues? Contact BEE/ASO/HTL</div>
           </div>
           <nav className="nav-tabs">
             <button
