@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { styles } from "./styles.js";
 import { scrollToTop, scrollToBottom } from "./lib/utils.jsx";
+import { fetchLoginEmail, isSessionExpired, onSessionExpired } from "./lib/session.js";
 import GolonganView from "./views/GolonganView.jsx";
 import TarifView from "./views/TarifView.jsx";
 import KenaikanView from "./views/KenaikanView.jsx";
@@ -18,6 +19,13 @@ const PANDUAN_URL = "https://drive.google.com/file/d/1B1Hc7ZFzZHywgborYsZcVJKCsi
 export default function App() {
   const [tab, setTab] = useState("tarif"); // halaman aktif: 'tarif' | 'golongan' | 'kenaikan' | 'pathway'
   const headerRef = useRef(null);
+  const [loginEmail, setLoginEmail] = useState(null);
+  const [sessionExpired, setSessionExpired] = useState(isSessionExpired);
+  const reloginRef = useRef(null);
+
+  useEffect(() => { fetchLoginEmail().then(setLoginEmail); }, []);
+  useEffect(() => onSessionExpired(() => setSessionExpired(true)), []);
+  useEffect(() => { if (sessionExpired) reloginRef.current?.focus(); }, [sessionExpired]);
 
   // Header menempel di atas; tinggi aslinya (berubah di HP karena tab turun ke
   // baris berikut) jadi --header-h, supaya bagian lain yang menempel bisa
@@ -41,6 +49,7 @@ export default function App() {
             <div className="header-title">Buku Tarif</div>
             <div className="header-sub">Pencarian tarif layanan & tindakan medis rumah sakit</div>
             <div className="header-sub">Got Issues? Contact BEE/ASO/HTL</div>
+            {loginEmail && <div className="header-sub header-login">Masuk sebagai {loginEmail}</div>}
           </div>
           <nav className="nav-tabs">
             <button
@@ -99,6 +108,22 @@ export default function App() {
           <button className="scroll-btn" onClick={scrollToTop} title="Ke Atas">↑</button>
           <button className="scroll-btn" onClick={scrollToBottom} title="Ke Bawah">↓</button>
         </div>
+
+        {sessionExpired && (
+          <div className="session-overlay">
+            <div className="session-card" role="alertdialog" aria-modal="true"
+              aria-labelledby="session-title" aria-describedby="session-text">
+              <h2 id="session-title" className="session-title">Sesi login habis</h2>
+              <p id="session-text" className="session-text">
+                Login berlaku 6 jam. Masuk lagi dengan email kantor untuk melanjutkan;
+                kode baru akan dikirim ke email kamu.
+              </p>
+              <button ref={reloginRef} className="session-btn" onClick={() => window.location.reload()}>
+                Masuk lagi
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

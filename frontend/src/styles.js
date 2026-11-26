@@ -98,6 +98,23 @@ export const styles = `
     margin-top: 3px; font-weight: 400;
     letter-spacing: 0.3px;
   }
+  .header-login { color: var(--gold-dark); }
+  /* Sesi login Cloudflare Access habis: menutupi halaman sampai masuk lagi */
+  .session-overlay {
+    position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: rgba(30, 22, 8, 0.45);
+  }
+  .session-card {
+    width: 100%; max-width: 400px; padding: 24px; border-radius: var(--radius-sm);
+    background: var(--card); border: 1px solid var(--border-mid); box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  }
+  .session-title { margin: 0 0 8px; font-size: 18px; font-weight: 600; color: var(--text); }
+  .session-text { margin: 0 0 18px; font-size: 14px; line-height: 1.5; color: var(--text-muted); }
+  .session-btn {
+    padding: 10px 18px; border: none; border-radius: var(--radius-sm); cursor: pointer;
+    background: var(--gold-dark); color: #fff; font-family: var(--font-body); font-size: 14px; font-weight: 600;
+  }
+  .session-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
   /* ─── MAIN ────────────────────────────────────────── */
   .main {
