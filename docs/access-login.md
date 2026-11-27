@@ -22,12 +22,10 @@ per orang.
 
 ## A. Uji dulu di URL preview (production tidak berubah)
 
-Setiap push ke branch PR punya dua alamat (lihat komentar Cloudflare di PR):
-- alamat per deploy, misalnya `https://146c69a4.tariff-book.pages.dev`.
-  Alamat ini berganti setiap push;
-- alamat branch yang tetap, misalnya
-  `https://claude-tender-franklin-bddnc.tariff-book.pages.dev`. Nama branch
-  dipotong oleh Cloudflare.
+URL preview branch: buka Cloudflare → Workers & Pages → **tariff-book** →
+Deployments, lalu cari deploy dari branch PR. Alias-nya berbentuk
+`<nama-branch>.tariff-book.pages.dev`, misalnya
+`claude-tender-franklin-bddncg.tariff-book.pages.dev`.
 
 1. **Zero Trust:** di dashboard Cloudflare, menu **Zero Trust**. Saat pertama
    kali, pilih nama tim (misalnya `buku-tarif`, jadi
@@ -35,20 +33,18 @@ Setiap push ke branch PR punya dua alamat (lihat komentar Cloudflare di PR):
    meminta kartu, tapi plan Free tidak ditagih.
 2. **Metode login:** Zero Trust → Settings → Authentication → Login methods.
    Pastikan **One-time PIN** ada. Biasanya sudah aktif.
-3. **Kunci semua alamat preview:** Workers & Pages → **tariff-book** →
-   Settings → General → **Access policy** → **Enable**. Cloudflare membuat
-   aplikasi Access untuk `*.tariff-book.pages.dev`, yaitu semua preview.
-   Production `tariff-book.pages.dev` tidak ikut terkunci.
-4. **Atur aplikasinya:** Zero Trust → Access → Applications → buka aplikasi
-   yang baru dibuat itu:
+3. **Aplikasi:** Access → Applications → **Add an application** →
+   **Self-hosted**.
+   - Application name: `Buku Tarif (uji)`
    - Session Duration: **6 hours**
-   - Policies: ubah atau ganti menjadi Action **Allow**, Include
-     **Emails ending in** `@asuransiastra.com`. Bawaannya hanya email akun
-     Cloudflare kamu.
-5. **Pengaman API (Preview saja):** di aplikasi itu salin
+   - Domain: hanya alias preview dari langkah di atas. Jangan isi
+     `tariff-book.pages.dev` dulu.
+4. **Policy:** nama `Email kantor`, Action **Allow**, Include
+   **Emails ending in** `@asuransiastra.com`. Simpan.
+5. **Pengaman API (Preview saja):** buka aplikasi tadi dan salin
    **Application Audience (AUD) Tag**. Lalu buka Workers & Pages →
-   tariff-book → Settings → Variables and Secrets, pilih environment
-   **Preview** (bukan Production), dan tambah:
+   tariff-book → Settings → Variables and Secrets. Pilih environment
+   **Preview** (bukan Production) dan tambah:
    - `ACCESS_TEAM_DOMAIN` = `buku-tarif.cloudflareaccess.com` (nama tim kamu)
    - `ACCESS_AUD` = AUD tag tadi
 
@@ -69,18 +65,12 @@ Setiap push ke branch PR punya dua alamat (lihat komentar Cloudflare di PR):
 - Log masuk: Zero Trust → Logs → **Access**, berisi email, waktu, dan IP.
 
 ## B. Go-live (setelah uji OK)
-1. Di aplikasi Access yang sama, tambah domain `tariff-book.pages.dev`
-   (production). Alamat preview sudah terkunci.
+1. Di aplikasi Access yang sama, tambah domain `tariff-book.pages.dev` dan
+   `*.tariff-book.pages.dev`. Yang kedua mengunci semua URL preview juga.
 2. Isi `ACCESS_TEAM_DOMAIN` dan `ACCESS_AUD` yang sama di environment
    **Production**.
-3. **Matikan salinan lain dari repo ini.** Setiap push juga di-deploy ke
-   Cloudflare Pages `buku-harga`, Cloudflare Workers `tariff-book`
-   (`*.workers.dev`), dan Vercel `tariff-book` (`*.vercel.app`). Salinan yang
-   tidak dikunci adalah pintu belakang. Lepaskan dari repo atau hapus
-   project yang tidak dipakai. Yang masih dipakai dikunci dengan Access dan
-   env yang sama.
-4. Merge PR-nya (kode tanpa env tidak mengunci apa pun, jadi urutan langkah
-   ini aman).
+3. Merge PR-nya (kode tanpa env tidak mengunci apa pun, jadi urutan langkah
+   1–3 aman).
 
 ## Kalau ada masalah
 - **Semua orang tiba-tiba tidak bisa ambil data** (API 401 `login_required`):
