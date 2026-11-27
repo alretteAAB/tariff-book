@@ -21,8 +21,6 @@ compare the results.
 
 ```
 frontend/functions/api/
-  _middleware.js runs before every /api/*: Cloudflare Access login check (see below)
-  _access.js     Access JWT verification (pure, tested)     (no route)
   _supabase.js   parseMulti(), json()                       (no route)
   _shards.js     shard registry, hospital→shard map, fan-out (no route)
   _merge.js      pure merge helpers: sort comparator, suggest/filters merge
@@ -45,7 +43,6 @@ scripts/upload_clinical_pathway.py  Excel upload of Clinical Pathway packages (G
 scripts/build_kategori_besar.py  Excel (sheet Mapping) → _kategori_besar.json
 workers/keepalive/            cron Worker: daily shard_stats() ping per shard
 docs/shard-guide.md           how-to for humans: new shard, uploading, moving, limits
-docs/access-login.md          how-to: OTP login for @asuransiastra.com with Cloudflare Access
 ```
 
 ## Database (per shard)
@@ -185,23 +182,6 @@ cd workers/keepalive && npx wrangler secret put SHARD_1_KEY && npx wrangler depl
 
 Cloudflare Pages build settings: root `frontend`, build command
 `npm install && npm run build` (not `npm ci`), output `dist`.
-
-## Login (Cloudflare Access)
-
-The site can be locked to `@asuransiastra.com` with Cloudflare Access (one-time
-PIN by email, 6-hour sessions), configured in the Zero Trust dashboard, not in
-code (`docs/access-login.md`). On top of it, `functions/api/_middleware.js`
-verifies the `Cf-Access-Jwt-Assertion` token on every `/api/*` (RS256
-signature against `https://<team>/cdn-cgi/access/certs`, `aud`, `iss`,
-`exp`/`nbf`, email domain exactly `ACCESS_EMAIL_DOMAIN`, default
-asuransiastra.com) and answers 401 `login_required` or, when the keys cannot be
-fetched, 503. It only runs when the Pages env `ACCESS_TEAM_DOMAIN` and
-`ACCESS_AUD` are set; without them every request passes (local dev, and
-production until go-live). In the browser `src/lib/session.js` wraps `fetch`
-for `/api/*` (`redirect: 'manual'`): an Access redirect or a 401
-`login_required` shows the "Sesi login habis" overlay; the header shows the
-email from `/cdn-cgi/access/get-identity`. The keep-alive Worker and the
-upload scripts talk to Supabase directly and are not affected.
 
 ## Gotchas
 
