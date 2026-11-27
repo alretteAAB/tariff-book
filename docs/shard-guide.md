@@ -161,6 +161,28 @@ the row count per hospital. Compare with your CSV.
   `kelas_kamar`, once `05_strict_unique.sql` has run on that shard). The
   dry run shows how many rows each hospital already has.
 
+### 2.6 Export everything (for review)
+`scripts/export_all.py` only **reads**: nothing is changed or deleted. It
+uses the same `scripts/.env` as the upload scripts.
+```bash
+cd scripts
+python export_all.py                 # tarif + golongan + clinical pathway
+python export_all.py --only tarif    # or golongan / cp
+```
+Output in `scripts/export_YYYY-MM-DD/` (git-ignored):
+- `tarif_semua.csv`: every hospital from every shard, in the upload columns
+  plus `shard`. It has ~2M rows, more than Excel opens (~1M), so use Power
+  BI, Python or a database, or filter it first.
+- `golongan.csv`: in the upload columns, including `tahun`.
+- `clinical_pathway.csv`: the combined upload layout, one row per
+  item × class.
+- `ringkasan.txt`: rows per hospital, checked against `shard_stats()`. A
+  line marked `BEDA` means the file does not match the database.
+
+All files can be uploaded again as they are. The CP uploader reads Excel,
+so open the CSV in Excel and save it as .xlsx first. The tarif export takes
+about 5–15 minutes (1000 rows per request).
+
 ---
 
 ## 3. Other things to know

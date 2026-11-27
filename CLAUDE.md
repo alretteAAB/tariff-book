@@ -41,6 +41,7 @@ sql/golongan/     01_schema → 02_rpc → 03_security  (golongan operasi projec
 scripts/upload_golongan.py    CSV/Excel upload of golongan operasi (GOLONGAN_SERVICE_KEY)
 scripts/upload_clinical_pathway.py  Excel upload of Clinical Pathway packages (GOLONGAN_SERVICE_KEY)
 scripts/build_kategori_besar.py  Excel (sheet Mapping) → _kategori_besar.json
+scripts/export_all.py         read-only CSV export of everything (all tarif shards, golongan, CP)
 workers/keepalive/            cron Worker: daily shard_stats() ping per shard
 docs/shard-guide.md           how-to for humans: new shard, uploading, moving, limits
 ```
@@ -177,6 +178,7 @@ cd scripts && pip install -r requirements.txt && python upload_tarif.py data.csv
 cd scripts && npm install && node move-hospital.js --from 1 --to 2 --rs "Nama RS" [--delete]
 cd scripts && python upload_golongan.py buku_golongan.csv --dry-run
 cd scripts && python upload_clinical_pathway.py tarif_gabungan.xlsx --dry-run
+cd scripts && python export_all.py [--only tarif|golongan|cp]   # read-only, → scripts/export_YYYY-MM-DD/
 cd workers/keepalive && npx wrangler secret put SHARD_1_KEY && npx wrangler deploy
 ```
 

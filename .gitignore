@@ -153,3 +153,5 @@ __pycache__/
 # data files used by the upload scripts (keep them out of git)
 scripts/*.xlsx
 scripts/*.csv
+# exports made by scripts/export_all.py
+scripts/export_*/
