@@ -10,6 +10,8 @@ Hasil di scripts/export_YYYY-MM-DD/ (folder ini tidak ikut ke git):
 - tarif_semua.csv      semua RS dari semua shard, kolom sama dengan format upload
                        (rumah_sakit, group_non_group, nama_group, kategori_harga,
                        nama_layanan, kelas_kamar, tahun, tarif) + shard.
+                       Urut per shard, lalu urutan upload (baris satu RS
+                       berkumpul karena di-upload per RS).
                        ~2 juta baris: tidak muat dibuka utuh di Excel (maks.
                        ~1 juta baris), buka dengan Power BI / Python / database,
                        atau filter dulu.
@@ -30,6 +32,7 @@ import csv
 import datetime
 import os
 import sys
+import time
 from collections import Counter
 from decimal import Decimal
 from pathlib import Path
@@ -37,6 +40,7 @@ from pathlib import Path
 from upload_tarif import Progress, fmt_int, load_env, shard_config
 
 PAGE = 1000   # batas baris per request API Supabase
+RETRY_WAIT = (2, 5, 10)   # detik, untuk gangguan sesaat (timeout, koneksi putus)
 KELAS_ORDER = {"KELAS 1": 1, "KELAS 2": 2, "KELAS 3": 3, "ODS": 4}
 
 
@@ -68,14 +72,27 @@ def open_csv(path: Path, header: list):
     return f, w
 
 
+def run(make_query, where: str) -> list:
+    """Jalankan satu request baca; gangguan sesaat dicoba ulang (RETRY_WAIT)."""
+    for attempt, wait in enumerate((*RETRY_WAIT, None), start=1):
+        try:
+            return make_query().execute().data
+        except Exception as err:   # APIError (mis. statement timeout), httpx, dll.
+            if wait is None:
+                sys.exit(f"\nGagal membaca {where} setelah {attempt} kali: {err}\n"
+                         "Tidak ada data yang diubah. Coba jalankan lagi beberapa saat lagi.")
+            print(f"\n  {where}: {err} -- coba lagi dalam {wait} detik ({attempt}/{len(RETRY_WAIT)})")
+            time.sleep(wait)
+
+
 def read_all(db, table: str, cols: str, key: str = "id") -> list:
     """Semua baris sebuah tabel, PAGE baris per request, urut `key` (keyset)."""
     rows, last = [], None
     while True:
-        q = db.table(table).select(cols).order(key).limit(PAGE)
-        if last is not None:
-            q = q.gt(key, last)
-        batch = q.execute().data
+        def q(last=last):
+            q = db.table(table).select(cols).order(key).limit(PAGE)
+            return q.gt(key, last) if last is not None else q
+        batch = run(q, f"{table} (setelah {key} {last})")
         rows += batch
         if len(batch) < PAGE:
             return rows
@@ -86,10 +103,12 @@ def read_ranged(db, table: str, cols: str, order: list) -> list:
     """Semua baris tabel tanpa kolom id tunggal (urut beberapa kolom, offset)."""
     rows, start = [], 0
     while True:
-        q = db.table(table).select(cols)
-        for c in order:
-            q = q.order(c)
-        batch = q.range(start, start + PAGE - 1).execute().data
+        def q(start=start):
+            q = db.table(table).select(cols)
+            for c in order:
+                q = q.order(c)
+            return q.range(start, start + PAGE - 1)
+        batch = run(q, f"{table} (baris {start})")
         rows += batch
         if len(batch) < PAGE:
             return rows
@@ -105,58 +124,65 @@ def export_tarif(out: Path, report: list) -> None:
     from supabase import create_client
     shards = {sid: create_client(url, key) for sid, (url, key) in shard_config().items()}
 
-    # Per shard: nama referensi (id -> nama), data RS, dan jumlah baris per RS.
-    plan = []      # (nama RS, shard id, rumah_sakit_id, baris menurut shard_stats)
-    refs, groups = {}, {}
+    # Per shard: nama referensi (id -> nama), data group RS, jumlah baris per RS.
+    refs, groups, stats = {}, {}, {}
     for sid, db in shards.items():
         print(f"shard {sid}: membaca daftar nama...")
         refs[sid] = {t: {r["id"]: r["nama"] for r in read_all(db, t, "id,nama")}
                      for t in ("rumah_sakit_ref", "kategori_ref", "kelas_kamar_ref", "layanan_ref")}
         groups[sid] = {r["rumah_sakit"]: r for r in read_all(
             db, "rumahsakit", "rumah_sakit,group_non_group,nama_group", key="rumah_sakit")}
-        stats = {h["rumah_sakit"]: h["rows"] for h in db.rpc("shard_stats").execute().data["hospitals"]}
-        for rs_id, nama in refs[sid]["rumah_sakit_ref"].items():
-            if stats.get(nama):
-                plan.append((nama, sid, rs_id, stats[nama]))
-    plan.sort(key=lambda p: (p[0].lower(), p[1]))
+        stats[sid] = {h["rumah_sakit"]: h["rows"]
+                      for h in run(lambda db=db: db.rpc("shard_stats"), f"shard {sid} shard_stats")["hospitals"]}
+    total = sum(n for st in stats.values() for n in st.values())
+    n_rs = sum(len(st) for st in stats.values())
+    print(f"\nTarif: {fmt_int(total)} baris dari {n_rs} RS di {len(shards)} shard")
 
-    total = sum(p[3] for p in plan)
-    print(f"\nTarif: {fmt_int(total)} baris dari {len(plan)} RS di {len(shards)} shard")
+    # Seluruh tarif_v2 per shard, urut id (keyset di primary key): tiap request
+    # membaca tepat PAGE baris berikutnya. Jangan filter per rumah_sakit_id di
+    # sini: index (rumah_sakit_id) tidak memuat id, sehingga "RS X urut id"
+    # bisa membaca ratusan ribu baris per halaman dan kena statement timeout.
     f, w = open_csv(out / "tarif_semua.csv", TARIF_HEADER)
     bar = Progress("Mengambil tarif", total)
-    written_total = 0
-    report.append("TARIF (tarif_semua.csv)")
+    written = Counter()   # (shard, RS) -> baris
     try:
-        for nama, sid, rs_id, expected in plan:
-            db, ref, grp = shards[sid], refs[sid], groups[sid].get(nama, {})
-            rows, last = [], None
+        for sid, db in shards.items():
+            ref = refs[sid]
+            rs_name, kat, kelas, lay = (ref["rumah_sakit_ref"], ref["kategori_ref"],
+                                        ref["kelas_kamar_ref"], ref["layanan_ref"])
+            last = None
             while True:
-                q = (db.table("tarif_v2").select("id,kategori_id,kelas_kamar_id,layanan_id,tahun,tarif")
-                     .eq("rumah_sakit_id", rs_id).order("id").limit(PAGE))
-                if last is not None:
-                    q = q.gt("id", last)
-                batch = q.execute().data
-                rows += batch
+                def q(last=last, db=db):
+                    q = (db.table("tarif_v2")
+                         .select("id,rumah_sakit_id,kategori_id,kelas_kamar_id,layanan_id,tahun,tarif")
+                         .order("id").limit(PAGE))
+                    return q.gt("id", last) if last is not None else q
+                batch = run(q, f"shard {sid} tarif_v2 (setelah id {last})")
+                for r in batch:
+                    nama = rs_name.get(r["rumah_sakit_id"], "")
+                    grp = groups[sid].get(nama, {})
+                    w.writerow((
+                        nama, text(grp.get("group_non_group")), text(grp.get("nama_group")),
+                        kat.get(r["kategori_id"], ""), lay.get(r["layanan_id"], ""),
+                        kelas.get(r["kelas_kamar_id"], "") if r["kelas_kamar_id"] is not None else "",
+                        num(r["tahun"]), num(r["tarif"]), sid,
+                    ))
+                    written[sid, nama] += 1
                 bar.add(len(batch))
                 if len(batch) < PAGE:
                     break
                 last = batch[-1]["id"]
-            out_rows = [(
-                nama, text(grp.get("group_non_group")), text(grp.get("nama_group")),
-                ref["kategori_ref"].get(r["kategori_id"], ""),
-                ref["layanan_ref"].get(r["layanan_id"], ""),
-                ref["kelas_kamar_ref"].get(r["kelas_kamar_id"], "") if r["kelas_kamar_id"] is not None else "",
-                num(r["tahun"]), num(r["tarif"]), sid,
-            ) for r in rows]
-            out_rows.sort(key=lambda r: (r[6] if r[6] != "" else 0, r[3], r[4], r[5]))
-            w.writerows(out_rows)
-            written_total += len(out_rows)
-            mark = "" if len(out_rows) == expected else f"   BEDA, database: {fmt_int(expected)}"
-            report.append(f"  {fmt_int(len(out_rows)):>10}  shard {sid}  {nama}{mark}")
     finally:
         f.close()
     bar.finish()
-    report.append(f"  {fmt_int(written_total):>10}  total (database: {fmt_int(total)})\n")
+
+    report.append("TARIF (tarif_semua.csv)")
+    keys = set(written) | {(sid, rs) for sid, st in stats.items() for rs in st}
+    for sid, nama in sorted(keys, key=lambda k: (k[1].lower(), k[0])):
+        got, expected = written.get((sid, nama), 0), stats[sid].get(nama, 0)
+        mark = "" if got == expected else f"   BEDA, database: {fmt_int(expected)}"
+        report.append(f"  {fmt_int(got):>10}  shard {sid}  {nama}{mark}")
+    report.append(f"  {fmt_int(sum(written.values())):>10}  total (database: {fmt_int(total)})\n")
 
 
 # --- Golongan ----------------------------------------------------------------
@@ -181,7 +207,7 @@ def export_golongan(out: Path, report: list) -> None:
     with f:
         w.writerows([[text(r[c]) if c != "tahun" else num(r[c]) for c in GOLONGAN_HEADER] for r in rows])
     per_rs = Counter(r["rumah_sakit"] for r in rows)
-    expected = {h["rumah_sakit"]: h["rows"] for h in db.rpc("shard_stats").execute().data["hospitals"]}
+    expected = {h["rumah_sakit"]: h["rows"] for h in run(lambda: db.rpc("shard_stats"), "golongan shard_stats")["hospitals"]}
     report.append("GOLONGAN (golongan.csv)")
     for rs in sorted(per_rs, key=str.lower):
         mark = "" if per_rs[rs] == expected.get(rs) else f"   BEDA, database: {fmt_int(expected.get(rs, 0))}"
